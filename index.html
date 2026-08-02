@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#f6f7f2" />
+  <title>WordStep · 日常英语词汇训练</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#" aria-label="WordStep 首页">
+        <span class="brand-mark">W</span>
+        <span>WordStep</span>
+      </a>
+      <nav class="nav-list" aria-label="主导航">
+        <button class="nav-item active" data-view="home"><span class="nav-icon">⌂</span><span>今日学习</span></button>
+        <button class="nav-item" data-view="library"><span class="nav-icon">▤</span><span>词库</span></button>
+        <button class="nav-item" data-view="progress"><span class="nav-icon">↗</span><span>学习进度</span></button>
+      </nav>
+      <div class="sidebar-bottom">
+        <button class="nav-item" data-action="open-settings"><span class="nav-icon">⚙</span><span>学习设置</span></button>
+        <div class="profile-card">
+          <div class="avatar">Hi</div>
+          <div><strong>英语重启计划</strong><small id="profile-streak">连续学习 0 天</small></div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="mobile-header">
+        <a class="brand" href="#"><span class="brand-mark">W</span><span>WordStep</span></a>
+        <button class="icon-button" data-action="open-settings" aria-label="打开设置">⚙</button>
+      </header>
+
+      <section id="home-view" class="view active">
+        <div class="page-heading">
+          <div><p class="eyebrow" id="today-date">今天</p><h1>早上好，继续向前一步。</h1><p>先复习，再认识新词。每天一点点，让英语重新成为习惯。</p></div>
+          <div class="streak-chip"><span>🔥</span><div><strong id="streak-number">0</strong><small>连续天数</small></div></div>
+        </div>
+
+        <section class="hero-card">
+          <div class="hero-copy">
+            <span class="pill light">TODAY'S PLAN · 今日计划</span>
+            <h2>今天的词，<br>准备好了吗？</h2>
+            <p id="plan-summary">正在生成你的个性化学习计划…</p>
+            <button class="primary-button light-button" id="start-session">开始今日学习 <span>→</span></button>
+          </div>
+          <div class="hero-visual" aria-hidden="true">
+            <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div>
+            <div class="word-card card-back"><span>复习</span><strong>review</strong></div>
+            <div class="word-card card-front"><span class="card-tag">DAILY LIFE</span><strong>morning</strong><small>/ˈmɔːrnɪŋ/</small><i>早晨</i></div>
+          </div>
+        </section>
+
+        <div class="section-title"><div><span class="eyebrow">TODAY'S TASKS</span><h2>今日任务</h2></div><span class="quiet" id="task-total">0 个待完成</span></div>
+        <section class="task-grid">
+          <article class="task-card review-task">
+            <div class="task-icon purple">↻</div><div class="task-info"><span class="task-label">智能复习</span><h3><span id="review-count">0</span> 个单词</h3><p>按记忆曲线与错题记录安排</p></div>
+            <div class="mini-progress"><span id="review-progress"></span></div>
+          </article>
+          <article class="task-card new-task">
+            <div class="task-icon green">＋</div><div class="task-info"><span class="task-label">学习新词</span><h3><span id="new-count">10</span> 个单词</h3><p id="today-scene">场景 · 居家生活</p></div>
+            <div class="mini-progress"><span id="new-progress"></span></div>
+          </article>
+          <article class="task-card spelling-task">
+            <div class="task-icon orange">Aa</div><div class="task-info"><span class="task-label">强化拼写</span><h3><span id="weak-count">0</span> 个易错词</h3><p>错误越多，出现得越频繁</p></div>
+            <div class="mini-progress"><span id="weak-progress"></span></div>
+          </article>
+        </section>
+
+        <section class="lower-grid">
+          <article class="panel progress-panel">
+            <div class="panel-heading"><div><span class="eyebrow">THIS WEEK</span><h3>本周节奏</h3></div><span class="subtle-chip" id="week-total">已练习 0 词</span></div>
+            <div class="week-chart" id="week-chart"></div>
+          </article>
+          <article class="panel tip-panel">
+            <span class="tip-mark">“</span><span class="eyebrow">LEARNING TIP</span><h3>记不住，并不是你不擅长。</h3><p>在快要忘记时回想一次，记忆会变得更牢。系统会替你找到这个时机。</p>
+          </article>
+        </section>
+      </section>
+
+      <section id="library-view" class="view">
+        <div class="page-heading compact"><div><p class="eyebrow">WORD LIBRARY</p><h1>生活与工作场景词库</h1><p>从熟悉的日常出发，逐步覆盖真实交流。</p></div></div>
+        <div class="library-toolbar"><div class="search-box">⌕ <input id="word-search" placeholder="搜索英文或中文…"></div><div class="filter-row" id="category-filters"></div></div>
+        <div class="library-stats" id="library-stats"></div>
+        <div class="word-list" id="word-list"></div>
+      </section>
+
+      <section id="progress-view" class="view">
+        <div class="page-heading compact"><div><p class="eyebrow">YOUR PROGRESS</p><h1>每一步都算数</h1><p>这里记录你正在建立的长期记忆。</p></div></div>
+        <div class="stat-grid" id="progress-stats"></div>
+        <section class="panel memory-panel"><div class="panel-heading"><div><span class="eyebrow">MEMORY STAGES</span><h3>记忆阶段分布</h3></div></div><div class="stage-list" id="stage-list"></div></section>
+      </section>
+    </main>
+  </div>
+
+  <div class="session-overlay" id="session-overlay" aria-hidden="true">
+    <div class="session-topbar">
+      <button class="round-button" id="close-session" aria-label="退出学习">×</button>
+      <div class="session-progress"><span id="session-progress-bar"></span></div>
+      <span id="session-step">1 / 10</span>
+    </div>
+    <div class="study-card" id="study-card"></div>
+  </div>
+
+  <div class="modal-backdrop" id="settings-modal" aria-hidden="true">
+    <div class="modal">
+      <button class="modal-close" data-action="close-settings">×</button>
+      <span class="eyebrow">LEARNING SETTINGS</span><h2>学习设置</h2><p>选择一个可以长期坚持的节奏，比一次学很多更重要。</p>
+      <label class="range-label"><span>每日新词数量</span><strong><span id="daily-value">10</span> 词</strong></label>
+      <input type="range" id="daily-range" min="5" max="30" step="5" value="10">
+      <div class="range-marks"><span>5</span><span>10</span><span>15</span><span>20</span><span>25</span><span>30</span></div>
+      <div class="setting-note"><span>◷</span><div><strong>预计每天 <span id="estimated-time">10</span> 分钟</strong><p>复习数量由遗忘曲线自动计算，不计入新词上限。</p></div></div>
+      <button class="primary-button full" id="save-settings">保存设置</button>
+      <button class="text-button danger" id="reset-progress">重置全部学习记录</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <script src="app.js"></script>
+</body>
+</html>
