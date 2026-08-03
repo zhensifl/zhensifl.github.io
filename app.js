@@ -1,4 +1,4 @@
-const WORDS = [
+const CURATED_WORDS = [
   // 居家生活
   ["morning","早晨","Good morning! Did you sleep well?","早上好！你睡得好吗？","居家生活","/ˈmɔːrnɪŋ/"],
   ["breakfast","早餐","I usually have breakfast at seven.","我通常七点吃早餐。","居家生活","/ˈbrekfəst/"],
@@ -77,7 +77,9 @@ const WORDS = [
   ["expect","预期；期待","What result do you expect?","你预期什么结果？","协作反馈","/ɪkˈspekt/"],
   ["decision","决定","We need to make a decision.","我们需要做决定。","协作反馈","/dɪˈsɪʒn/"],
   ["opportunity","机会","This is a great opportunity.","这是一个很好的机会。","协作反馈","/ˌɑːpərˈtuːnəti/"],
-].map((w,i)=>({id:i+1,en:w[0],zh:w[1],example:w[2],exampleZh:w[3],category:w[4],phonetic:w[5]}));
+].map(w=>({en:w[0],zh:w[1],example:w[2],exampleZh:w[3],category:w[4],phonetic:w[5]}));
+
+const WORDS = [...CURATED_WORDS,...(window.WORD_DATA||[])].map((word,index)=>({...word,id:index+1}));
 
 const STORAGE_KEY = "wordstep-state-v1";
 const DAY = 86400000;
@@ -86,6 +88,7 @@ const categoryNames = [...new Set(WORDS.map(w=>w.category))];
 const defaultState = {dailyGoal:10, words:{}, activity:{}, lastStudyDate:null};
 let state = loadState();
 let activeCategory = "全部";
+let libraryLimit = 100;
 let session = null;
 
 function localDate(d=new Date()){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0");return `${y}-${m}-${day}`}
@@ -101,6 +104,13 @@ function newAllowance(){return Math.max(0,state.dailyGoal-learnedToday())}
 function todayQueue(){return [...dueWords(),...unseenWords().slice(0,newAllowance())]}
 function streak(){const days=Object.keys(state.activity).filter(k=>state.activity[k]?.completed>0).sort().reverse();if(!days.length)return 0;let cursor=dayStart(),count=0;const today=localDate();if(days[0]!==today)cursor-=DAY;while(days.includes(localDate(new Date(cursor)))){count++;cursor-=DAY}return count}
 function showToast(text){const el=document.querySelector("#toast");el.textContent=text;el.classList.add("show");setTimeout(()=>el.classList.remove("show"),2200)}
+function speakWord(text){
+  if(!("speechSynthesis" in window)){showToast("当前浏览器不支持语音播放");return}
+  window.speechSynthesis.cancel();
+  const utterance=new SpeechSynthesisUtterance(text);utterance.lang="en-US";utterance.rate=.78;utterance.pitch=1;
+  const voices=window.speechSynthesis.getVoices();utterance.voice=voices.find(v=>v.lang==="en-US")||voices.find(v=>v.lang.startsWith("en"))||null;
+  window.speechSynthesis.speak(utterance);
+}
 
 function renderDashboard(){
   const due=dueWords().length, fresh=Math.min(newAllowance(),unseenWords().length), weak=weakWords().length, total=due+fresh;
@@ -122,7 +132,8 @@ function renderLibrary(){
   const learned=WORDS.filter(w=>ws(w.id).stage>=0).length, mastered=WORDS.filter(w=>ws(w.id).stage>=5).length;
   document.querySelector("#library-stats").innerHTML=`<span class="small-stat"><strong>${WORDS.length}</strong> 总词汇</span><span class="small-stat"><strong>${learned}</strong> 已学习</span><span class="small-stat"><strong>${mastered}</strong> 已掌握</span>`;
   const q=document.querySelector("#word-search").value.trim().toLowerCase();const filtered=WORDS.filter(w=>(activeCategory==="全部"||w.category===activeCategory)&&(!q||w.en.includes(q)||w.zh.includes(q)));
-  document.querySelector("#word-list").innerHTML=filtered.length?filtered.map(w=>{const s=ws(w.id);const status=s.stage<0?["未学习",""]:s.stage>=5?["已掌握","mastered"]:["学习中","learning"];return `<div class="word-row"><div class="word-en"><strong>${w.en}</strong><small>${w.phonetic}</small></div><div class="word-zh">${w.zh}</div><div class="word-example">${w.example}<br><small>${w.exampleZh}</small></div><span class="status-badge ${status[1]}">${status[0]}</span></div>`}).join(""):`<div class="empty-state">没有找到匹配的单词</div>`;
+  const visible=filtered.slice(0,libraryLimit);
+  document.querySelector("#word-list").innerHTML=filtered.length?visible.map(w=>{const s=ws(w.id);const status=s.stage<0?["未学习",""]:s.stage>=5?["已掌握","mastered"]:["学习中","learning"];return `<div class="word-row"><div class="word-en"><div class="word-title"><strong>${w.en}</strong><button class="speak-button" data-speak="${escapeAttr(w.en)}" aria-label="朗读 ${escapeAttr(w.en)}" title="点击发音">🔊</button></div><small>${w.phonetic}</small></div><div class="word-zh">${w.zh}</div><div class="word-example">${w.example||`场景 · ${w.category}`}<br><small>${w.exampleZh||"点击扬声器听发音"}</small></div><span class="status-badge ${status[1]}">${status[0]}</span></div>`}).join("")+`${visible.length<filtered.length?`<button class="load-more" id="load-more">再显示 ${Math.min(100,filtered.length-visible.length)} 个 · 共 ${filtered.length} 个</button>`:""}`:`<div class="empty-state">没有找到匹配的单词</div>`;
 }
 function renderProgress(){
   const learned=WORDS.filter(w=>ws(w.id).stage>=0), mastered=learned.filter(w=>ws(w.id).stage>=5), errors=Object.values(state.words).reduce((n,s)=>n+(s.errors||0),0), practiced=Object.values(state.activity).reduce((n,a)=>n+(a.completed||0),0);
@@ -144,16 +155,16 @@ function renderQuestion(){
   const w=currentWord(),progress=(session.idx/session.queue.length)*100;document.querySelector("#session-progress-bar").style.width=`${progress}%`;document.querySelector("#session-step").textContent=`${session.idx+1} / ${session.queue.length}`;
   if(session.phase==="choice"){
     const reverse=(w.id+session.idx)%2===0,field=reverse?"en":"zh",question=reverse?w.zh:w.en,answers=shuffle([w[field],...distractors(w,field)]);
-    document.querySelector("#study-card").innerHTML=`<span class="question-type">${reverse?"中文 → 英文":"英文 → 中文"}</span><h2 class="question-main ${reverse?"chinese":""}">${question}</h2>${reverse?"":`<span class="phonetic">${w.phonetic}</span>`}<p class="question-note">选择正确含义，然后完成拼写</p><div class="choice-grid">${answers.map(a=>`<button class="choice" data-answer="${escapeAttr(a)}">${a}</button>`).join("")}</div><div id="choice-feedback"></div>`;
-    document.querySelectorAll(".choice").forEach(btn=>btn.addEventListener("click",()=>answerChoice(btn,w[field])));
+    document.querySelector("#study-card").innerHTML=`<span class="question-type">${reverse?"中文 → 英文":"英文 → 中文"}</span><div class="question-word-row"><h2 class="question-main ${reverse?"chinese":""}">${question}</h2>${reverse?"":`<button class="speak-button large" data-speak="${escapeAttr(w.en)}" aria-label="朗读 ${escapeAttr(w.en)}">🔊</button>`}</div>${reverse?"":`<span class="phonetic">${w.phonetic}</span>`}<p class="question-note">选择正确含义，然后完成拼写</p><div class="choice-grid">${answers.map(a=>`<button class="choice" data-answer="${escapeAttr(a)}">${a}</button>`).join("")}</div><div id="choice-feedback"></div>`;
+    document.querySelectorAll(".choice").forEach(btn=>btn.addEventListener("click",()=>answerChoice(btn,w[field],field==="en"?w.en:"")));
   }else renderSpelling();
 }
-function answerChoice(btn,answer){const correct=btn.dataset.answer===answer;document.querySelectorAll(".choice").forEach(b=>{b.disabled=true;if(b.dataset.answer===answer)b.classList.add("correct")});if(!correct){btn.classList.add("wrong");session.errors++;session.currentErrorCount++;session.currentHadError=true}document.querySelector("#choice-feedback").innerHTML=`<div class="feedback ${correct?"success":"error"}"><strong>${correct?"答对了！":"记一下正确答案："} ${answer}</strong><button class="continue-button" id="to-spelling">继续拼写 →</button></div>`;document.querySelector("#to-spelling").onclick=()=>{session.phase="spelling";renderQuestion()}}
-function renderSpelling(){const w=currentWord();document.querySelector("#study-card").innerHTML=`<span class="question-type">拼写练习 · 必须拼对才能继续</span><h2 class="question-main chinese">${w.zh}</h2><p class="question-note">${w.example.replace(new RegExp(w.en,"i"),"______")}</p><form class="spell-form" id="spell-form"><input class="spell-input" id="spell-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="输入英文单词" aria-label="输入英文拼写"><div id="spell-feedback"></div><button class="primary-button" type="submit">检查拼写</button></form>`;const input=document.querySelector("#spell-input");input.focus();document.querySelector("#spell-form").onsubmit=e=>{e.preventDefault();checkSpelling(input.value)} }
+function answerChoice(btn,answer,speakText){const correct=btn.dataset.answer===answer;document.querySelectorAll(".choice").forEach(b=>{b.disabled=true;if(b.dataset.answer===answer)b.classList.add("correct")});if(!correct){btn.classList.add("wrong");session.errors++;session.currentErrorCount++;session.currentHadError=true}document.querySelector("#choice-feedback").innerHTML=`<div class="feedback ${correct?"success":"error"}"><strong>${correct?"答对了！":"记一下正确答案："} ${answer}</strong><div class="feedback-actions">${speakText?`<button class="speak-button" data-speak="${escapeAttr(speakText)}" aria-label="朗读 ${escapeAttr(speakText)}">🔊</button>`:""}<button class="continue-button" id="to-spelling">继续拼写 →</button></div></div>`;document.querySelector("#to-spelling").onclick=()=>{session.phase="spelling";renderQuestion()}}
+function renderSpelling(){const w=currentWord(),clue=w.example?w.example.replace(new RegExp(w.en,"i"),"______"):`场景 · ${w.category}　根据中文含义拼写英文`;document.querySelector("#study-card").innerHTML=`<span class="question-type">拼写练习 · 必须拼对才能继续</span><h2 class="question-main chinese">${w.zh}</h2><p class="question-note">${clue}</p><form class="spell-form" id="spell-form"><input class="spell-input" id="spell-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="输入英文单词" aria-label="输入英文拼写"><div id="spell-feedback"></div><button class="primary-button" type="submit">检查拼写</button></form>`;const input=document.querySelector("#spell-input");input.focus();document.querySelector("#spell-form").onsubmit=e=>{e.preventDefault();checkSpelling(input.value)} }
 function checkSpelling(value){const w=currentWord(),input=document.querySelector("#spell-input"),normalized=value.trim().toLowerCase();if(normalized===w.en.toLowerCase()){
-    input.classList.add("success");input.disabled=true;session.correct++;const label=session.forceCorrection?"重新拼对了，这次会记得更牢。":"拼写正确！";document.querySelector("#spell-feedback").innerHTML=`<div class="feedback success"><strong>✓ ${label}</strong><button type="button" class="continue-button" id="next-word">继续 →</button></div>`;document.querySelector("#next-word").onclick=finishWord;
+    input.classList.add("success");input.disabled=true;session.correct++;const label=session.forceCorrection?"重新拼对了，这次会记得更牢。":"拼写正确！";document.querySelector("#spell-feedback").innerHTML=`<div class="feedback success"><strong>✓ ${label}</strong><div class="feedback-actions"><button type="button" class="speak-button" data-speak="${escapeAttr(w.en)}" aria-label="朗读 ${escapeAttr(w.en)}">🔊</button><button type="button" class="continue-button" id="next-word">继续 →</button></div></div>`;document.querySelector("#next-word").onclick=finishWord;
   }else{
-    session.errors++;session.currentErrorCount++;session.currentHadError=true;session.forceCorrection=true;input.classList.add("error");input.value="";input.placeholder="看一遍答案，再重新输入";document.querySelector("#spell-feedback").innerHTML=`<div class="correction-box">正确拼写是<strong>${w.en}</strong>请重新完整输入一次，拼对后才能继续。</div>`;input.focus();
+    session.errors++;session.currentErrorCount++;session.currentHadError=true;session.forceCorrection=true;input.classList.add("error");input.value="";input.placeholder="看一遍答案，再重新输入";document.querySelector("#spell-feedback").innerHTML=`<div class="correction-box">正确拼写是<div class="correction-word"><strong>${w.en}</strong><button type="button" class="speak-button" data-speak="${escapeAttr(w.en)}" aria-label="朗读 ${escapeAttr(w.en)}">🔊</button></div>请重新完整输入一次，拼对后才能继续。</div>`;input.focus();
   }}
 function finishWord(){
   const w=currentWord(),s=ws(w.id),wasNew=s.stage<0;let stage=s.stage;
@@ -174,7 +185,9 @@ document.querySelector("#daily-range").addEventListener("input",updateRange);fun
 document.querySelector("#save-settings").onclick=()=>{state.dailyGoal=+document.querySelector("#daily-range").value;saveState();document.querySelector("#settings-modal").classList.remove("active");renderDashboard();showToast("学习计划已更新")};
 document.querySelector("#reset-progress").onclick=()=>{if(confirm("确定要清除全部学习记录吗？此操作无法撤销。")){state=structuredClone(defaultState);saveState();document.querySelector("#settings-modal").classList.remove("active");renderDashboard();showToast("学习记录已重置")}};
 document.querySelector("#start-session").onclick=openSession;document.querySelector("#close-session").onclick=()=>{if(confirm("要先退出吗？已经完成的单词会保留进度。"))closeSession()};
-document.querySelector("#word-search").addEventListener("input",renderLibrary);document.querySelector("#category-filters").addEventListener("click",e=>{if(e.target.dataset.category){activeCategory=e.target.dataset.category;renderLibrary()}});
+document.querySelector("#word-search").addEventListener("input",()=>{libraryLimit=100;renderLibrary()});document.querySelector("#category-filters").addEventListener("click",e=>{if(e.target.dataset.category){activeCategory=e.target.dataset.category;libraryLimit=100;renderLibrary()}});
+document.querySelector("#word-list").addEventListener("click",e=>{if(e.target.id==="load-more"){libraryLimit+=100;renderLibrary()}});
+document.addEventListener("click",e=>{const button=e.target.closest("[data-speak]");if(button){e.preventDefault();e.stopPropagation();speakWord(button.dataset.speak)}});
 document.querySelector("#settings-modal").addEventListener("click",e=>{if(e.target.id==="settings-modal")e.currentTarget.classList.remove("active")});
 
 renderDashboard();renderLibrary();renderProgress();

@@ -97,6 +97,11 @@
         <section class="panel memory-panel"><div class="panel-heading"><div><span class="eyebrow">MEMORY STAGES</span><h3>记忆阶段分布</h3></div></div><div class="stage-list" id="stage-list"></div></section>
       </section>
     </main>
+    <nav class="mobile-nav" aria-label="手机导航">
+      <button class="nav-item active" data-view="home" aria-label="学习"><span class="nav-icon">⌂</span><span>学习</span></button>
+      <button class="nav-item" data-view="library" aria-label="词库"><span class="nav-icon">▤</span><span>词库</span></button>
+      <button class="nav-item" data-view="progress" aria-label="进度"><span class="nav-icon">↗</span><span>进度</span></button>
+    </nav>
   </div>
 
   <div class="session-overlay" id="session-overlay" aria-hidden="true">
@@ -122,6 +127,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
+  <script src="words-data.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
