@@ -82,19 +82,53 @@ const CURATED_WORDS = [
 const WORDS = [...CURATED_WORDS,...(window.WORD_DATA||[])].map((word,index)=>({...word,id:index+1}));
 
 const STORAGE_KEY = "wordstep-state-v1";
+const AUTH_STORAGE_KEY = "wordstep-auth-v1";
+const SUPABASE_URL = "https://wgvxdzwrvgktcidmofit.supabase.co";
+const SUPABASE_KEY = "sb_publishable_O2PaZM-nTJKAaeUYKiXbBw_r4WmllMx";
 const DAY = 86400000;
 const STAGE_DAYS = [1,2,4,7,15,30,60];
 const categoryNames = [...new Set(WORDS.map(w=>w.category))];
-const defaultState = {dailyGoal:10, words:{}, activity:{}, lastStudyDate:null};
+const defaultState = {dailyGoal:10, words:{}, activity:{}, lastStudyDate:null, updatedAt:0};
 let state = loadState();
 let activeCategory = "全部";
 let libraryLimit = 100;
 let session = null;
+let authSession = loadAuthSession();
+let authMode = "login";
+let syncTimer = null;
+let syncBusy = false;
+let syncQueued = false;
+let replaceCloudOnNextSync = false;
+let syncStatus = "未登录 · 进度仅保存在当前设备";
+let authMessage = "";
 
 function localDate(d=new Date()){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0");return `${y}-${m}-${day}`}
 function dayStart(d=new Date()){return new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime()}
 function loadState(){try{return {...defaultState,...JSON.parse(localStorage.getItem(STORAGE_KEY)||"{}")}}catch{return structuredClone(defaultState)}}
-function saveState(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}
+function persistLocalState(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}
+function saveState({replaceCloud=false}={}){state.updatedAt=Date.now();persistLocalState();if(replaceCloud)replaceCloudOnNextSync=true;scheduleCloudSync()}
+function loadAuthSession(){try{return JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY)||"null")}catch{return null}}
+function setAuthSession(next){authSession=next;if(next)localStorage.setItem(AUTH_STORAGE_KEY,JSON.stringify(next));else localStorage.removeItem(AUTH_STORAGE_KEY);renderAccountUI()}
+function authHeaders(token=authSession?.access_token){const headers={apikey:SUPABASE_KEY,"Content-Type":"application/json"};if(token)headers.Authorization=`Bearer ${token}`;return headers}
+async function supabaseRequest(path,{method="GET",body,token,headers={}}={}){const response=await fetch(`${SUPABASE_URL}${path}`,{method,headers:{...authHeaders(token),...headers},body:body===undefined?undefined:JSON.stringify(body)});if(!response.ok){let detail={};try{detail=await response.json()}catch{}throw new Error(detail.msg||detail.message||detail.error_description||detail.error||`请求失败（${response.status}）`)}if(response.status===204)return null;const text=await response.text();return text?JSON.parse(text):null}
+function normalizeSession(data){if(!data?.access_token)return null;return {...data,expires_at:data.expires_at||Math.floor(Date.now()/1000)+(data.expires_in||3600)}}
+async function ensureSession(){if(!authSession)return null;if((authSession.expires_at||0)>Math.floor(Date.now()/1000)+60)return authSession;try{const data=await supabaseRequest("/auth/v1/token?grant_type=refresh_token",{method:"POST",body:{refresh_token:authSession.refresh_token},token:null});setAuthSession(normalizeSession(data));return authSession}catch{setAuthSession(null);syncStatus="登录已过期，请重新登录";return null}}
+function wordRecordScore(record={}){return +(record.modifiedAt||0)||Date.parse(record.lastSeen||"")||+(record.seen||0)}
+function mergeProgress(local,cloud){
+  const a={...defaultState,...(local||{}),words:{...(local?.words||{})},activity:{...(local?.activity||{})}},b={...defaultState,...(cloud||{})};
+  const merged={...defaultState,dailyGoal:(b.updatedAt||0)>(a.updatedAt||0)?b.dailyGoal:a.dailyGoal,words:{},activity:{},lastStudyDate:[a.lastStudyDate,b.lastStudyDate].filter(Boolean).sort().pop()||null,updatedAt:Math.max(a.updatedAt||0,b.updatedAt||0)};
+  new Set([...Object.keys(a.words||{}),...Object.keys(b.words||{})]).forEach(id=>{const left=a.words?.[id],right=b.words?.[id];merged.words[id]=!left?right:!right?left:wordRecordScore(right)>wordRecordScore(left)?right:left});
+  new Set([...Object.keys(a.activity||{}),...Object.keys(b.activity||{})]).forEach(day=>{const left=a.activity?.[day]||{},right=b.activity?.[day]||{};merged.activity[day]={completed:Math.max(left.completed||0,right.completed||0),reviews:Math.max(left.reviews||0,right.reviews||0),new:Math.max(left.new||0,right.new||0),spelling:Math.max(left.spelling||0,right.spelling||0)}});
+  return merged;
+}
+function scheduleCloudSync(){if(!authSession)return;clearTimeout(syncTimer);syncTimer=setTimeout(()=>syncProgress(),900)}
+async function syncProgress(notify=false){
+  if(!authSession)return false;if(syncBusy){syncQueued=true;return false}syncBusy=true;const replaceCloud=replaceCloudOnNextSync;replaceCloudOnNextSync=false;syncStatus="正在同步…";renderAccountUI();
+  try{const valid=await ensureSession();if(!valid)throw new Error("登录已过期");const rows=await supabaseRequest(`/rest/v1/user_progress?select=state&user_id=eq.${encodeURIComponent(valid.user.id)}`);if(!replaceCloud)state=mergeProgress(state,rows?.[0]?.state);persistLocalState();await supabaseRequest("/rest/v1/user_progress?on_conflict=user_id",{method:"POST",body:{user_id:valid.user.id,state},token:valid.access_token,headers:{Prefer:"resolution=merge-duplicates"}});syncStatus=`已同步 · ${new Date().toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"})}`;renderDashboard();renderLibrary();renderProgress();if(notify)showToast("学习进度已同步")}
+  catch(error){if(replaceCloud)replaceCloudOnNextSync=true;syncStatus="同步失败，稍后会自动重试";clearTimeout(syncTimer);if(authSession)syncTimer=setTimeout(()=>syncProgress(),15000);if(notify)showToast(authErrorText(error.message))}
+  finally{syncBusy=false;renderAccountUI();if(syncQueued){syncQueued=false;scheduleCloudSync()}}
+  return true;
+}
 function ws(id){return state.words[id]||{stage:-1,due:0,errors:0,unknowns:0,correct:0,seen:0,lastSeen:null,learnedOn:null}}
 function learnedToday(){const t=localDate();return Object.values(state.words).filter(x=>x.learnedOn===t).length}
 function dueWords(){const now=dayStart();return WORDS.filter(w=>{const s=ws(w.id);return s.stage>=0&&s.due<=now}).sort((a,b)=>(ws(b.id).unknowns||0)-(ws(a.id).unknowns||0)||(ws(b.id).errors||0)-(ws(a.id).errors||0)||ws(a.id).due-ws(b.id).due)}
@@ -110,6 +144,56 @@ function speakWord(text){
   const utterance=new SpeechSynthesisUtterance(text);utterance.lang="en-US";utterance.rate=.78;utterance.pitch=1;
   const voices=window.speechSynthesis.getVoices();utterance.voice=voices.find(v=>v.lang==="en-US")||voices.find(v=>v.lang.startsWith("en"))||null;
   window.speechSynthesis.speak(utterance);
+}
+
+function authErrorText(message=""){
+  const text=message.toLowerCase();
+  if(text.includes("invalid login credentials"))return "邮箱或密码不正确";
+  if(text.includes("email not confirmed"))return "请先打开验证邮件完成邮箱确认";
+  if(text.includes("user already registered"))return "这个邮箱已经注册，请直接登录";
+  if(text.includes("password should be"))return "密码至少需要 6 位";
+  if(text.includes("unable to validate")||text.includes("expired"))return "登录已过期，请重新登录";
+  if(text.includes("failed to fetch")||text.includes("network"))return "网络连接失败，请稍后重试";
+  return message||"操作失败，请稍后重试";
+}
+function accountLabel(){return authSession?.user?.email?.split("@")[0]||"登录并同步"}
+function renderAccountUI(){
+  const signedIn=!!authSession?.user, name=document.querySelector("#profile-name"),avatar=document.querySelector("#profile-avatar"),icon=document.querySelector(".account-icon");
+  if(name)name.textContent=signedIn?accountLabel():"登录并同步";
+  if(avatar)avatar.textContent=signedIn?accountLabel().slice(0,2).toUpperCase():"Hi";
+  if(icon){icon.textContent=signedIn?"✓":"☁";icon.classList.toggle("synced",signedIn)}
+  const modal=document.querySelector("#auth-modal");if(modal?.classList.contains("active"))renderAuthModal();
+}
+function renderAuthModal(){
+  const content=document.querySelector("#auth-content");if(!content)return;
+  if(authSession?.user){
+    content.innerHTML=`<span class="eyebrow">CLOUD SYNC · 云端同步</span><h2>进度已连接</h2><p class="auth-lead">同一账号登录手机、平板或电脑，学习记录会自动合并。</p><div class="account-summary"><div class="avatar">${escapeAttr(accountLabel().slice(0,2).toUpperCase())}</div><div><strong>${escapeAttr(authSession.user.email||"")}</strong><small id="sync-status-text">${escapeAttr(syncStatus)}</small></div></div><button class="primary-button full" id="sync-now" ${syncBusy?"disabled":""}>${syncBusy?"正在同步…":"立即同步"}</button><button class="text-button danger" id="logout-account">退出登录</button>`;
+    document.querySelector("#sync-now").onclick=()=>syncProgress(true);
+    document.querySelector("#logout-account").onclick=logoutAccount;
+    return;
+  }
+  const isLogin=authMode==="login";
+  content.innerHTML=`<span class="eyebrow">CLOUD SYNC · 云端同步</span><h2>${isLogin?"登录同步进度":"创建学习账号"}</h2><p class="auth-lead">${isLogin?"在所有设备上使用同一个邮箱和密码。":"注册后，当前设备已有的学习记录会自动上传。"}</p><div class="auth-tabs"><button class="${isLogin?"active":""}" data-auth-mode="login">登录</button><button class="${!isLogin?"active":""}" data-auth-mode="signup">注册</button></div><form class="auth-form" id="auth-form"><label>邮箱<input id="auth-email" type="email" autocomplete="email" placeholder="name@example.com" required></label><label>密码<input id="auth-password" type="password" autocomplete="${isLogin?"current-password":"new-password"}" minlength="6" placeholder="至少 6 位" required></label>${authMessage?`<p class="auth-message">${escapeAttr(authMessage)}</p>`:""}<button class="primary-button full" type="submit">${isLogin?"登录并同步":"注册账号"}</button></form><p class="privacy-note">密码由 Supabase 安全处理，WordStep 不会读取或保存明文密码。</p>`;
+  content.querySelectorAll("[data-auth-mode]").forEach(button=>button.onclick=()=>{authMode=button.dataset.authMode;authMessage="";renderAuthModal()});
+  document.querySelector("#auth-form").onsubmit=handleAuthSubmit;
+}
+async function handleAuthSubmit(event){
+  event.preventDefault();const email=document.querySelector("#auth-email").value.trim(),password=document.querySelector("#auth-password").value,button=event.submitter||event.currentTarget.querySelector("button[type=submit]");button.disabled=true;button.textContent=authMode==="login"?"正在登录…":"正在注册…";authMessage="";
+  try{
+    if(authMode==="signup"){
+      const redirect=encodeURIComponent(`${location.origin}${location.pathname}`),data=await supabaseRequest(`/auth/v1/signup?redirect_to=${redirect}`,{method:"POST",body:{email,password}}),next=normalizeSession(data);
+      if(next){setAuthSession(next);syncStatus="正在合并本机与云端进度…";await syncProgress(true);document.querySelector("#auth-modal").classList.remove("active")}
+      else{authMode="login";authMessage="注册成功！请打开邮箱中的验证邮件，验证后再回来登录。";renderAuthModal()}
+    }else{
+      const data=await supabaseRequest("/auth/v1/token?grant_type=password",{method:"POST",body:{email,password},token:null});setAuthSession(normalizeSession(data));syncStatus="正在合并本机与云端进度…";await syncProgress(true);document.querySelector("#auth-modal").classList.remove("active")
+    }
+  }catch(error){authMessage=authErrorText(error.message);renderAuthModal()}
+}
+async function logoutAccount(){
+  const current=authSession;try{await syncProgress();if(current)await supabaseRequest("/auth/v1/logout",{method:"POST",token:current.access_token})}catch{}setAuthSession(null);syncStatus="未登录 · 进度仅保存在当前设备";authMessage="";renderAuthModal();showToast("已退出登录，本机进度仍会保留")
+}
+async function initAuth(){
+  renderAccountUI();if(!authSession)return;syncStatus="正在连接云端…";renderAccountUI();const valid=await ensureSession();if(valid)await syncProgress();else renderAccountUI()
 }
 
 function renderDashboard(){
@@ -176,7 +260,7 @@ function finishWord(){
   const w=currentWord(),s=ws(w.id),wasNew=s.stage<0;let stage=s.stage;
   if(session.currentUnknown)stage=0;else if(session.currentHadError)stage=Math.max(0,stage-1);else stage=Math.min(STAGE_DAYS.length-1,stage+1);
   if(wasNew)stage=0;const unknownTotal=session.currentUnknown?(s.unknowns||0)+1:Math.max(0,(s.unknowns||0)-(session.currentHadError?0:1)),errorPenalty=Math.min(0.75,(s.errors+session.currentErrorCount)*.08+unknownTotal*.1),interval=Math.max(1,Math.round(STAGE_DAYS[stage]*(1-errorPenalty)));
-  state.words[w.id]={...s,stage,due:dayStart()+interval*DAY,errors:s.errors+session.currentErrorCount,unknowns:unknownTotal,correct:s.correct+(!session.currentHadError?1:0),seen:s.seen+1,lastSeen:localDate(),learnedOn:s.learnedOn||(wasNew?localDate():null)};
+  state.words[w.id]={...s,stage,due:dayStart()+interval*DAY,errors:s.errors+session.currentErrorCount,unknowns:unknownTotal,correct:s.correct+(!session.currentHadError?1:0),seen:s.seen+1,lastSeen:localDate(),learnedOn:s.learnedOn||(wasNew?localDate():null),modifiedAt:Date.now()};
   const key=localDate(),a=state.activity[key]||{};state.activity[key]={completed:(a.completed||0)+1,reviews:(a.reviews||0)+(wasNew?0:1),new:(a.new||0)+(wasNew?1:0),spelling:(a.spelling||0)+1};state.lastStudyDate=key;saveState();
   session.idx++;session.phase="choice";session.currentHadError=false;session.currentErrorCount=0;session.currentUnknown=false;session.forceCorrection=false;if(session.idx>=session.queue.length)renderComplete();else renderQuestion();
 }
@@ -187,14 +271,17 @@ function escapeAttr(s){return String(s).replaceAll("&","&amp;").replaceAll('"',"
 document.querySelectorAll(".nav-item[data-view]").forEach(b=>b.addEventListener("click",()=>switchView(b.dataset.view)));
 document.querySelectorAll('[data-action="open-settings"]').forEach(b=>b.addEventListener("click",()=>{document.querySelector("#daily-range").value=state.dailyGoal;updateRange();document.querySelector("#settings-modal").classList.add("active")}));
 document.querySelectorAll('[data-action="close-settings"]').forEach(b=>b.addEventListener("click",()=>document.querySelector("#settings-modal").classList.remove("active")));
+document.querySelectorAll('[data-action="open-auth"]').forEach(b=>b.addEventListener("click",()=>{authMessage="";renderAuthModal();document.querySelector("#auth-modal").classList.add("active")}));
+document.querySelectorAll('[data-action="close-auth"]').forEach(b=>b.addEventListener("click",()=>document.querySelector("#auth-modal").classList.remove("active")));
 document.querySelector("#daily-range").addEventListener("input",updateRange);function updateRange(){const n=+document.querySelector("#daily-range").value;document.querySelector("#daily-value").textContent=n;document.querySelector("#estimated-time").textContent=Math.ceil(n*.75)}
 document.querySelector("#save-settings").onclick=()=>{state.dailyGoal=+document.querySelector("#daily-range").value;saveState();document.querySelector("#settings-modal").classList.remove("active");renderDashboard();showToast("学习计划已更新")};
-document.querySelector("#reset-progress").onclick=()=>{if(confirm("确定要清除全部学习记录吗？此操作无法撤销。")){state=structuredClone(defaultState);saveState();document.querySelector("#settings-modal").classList.remove("active");renderDashboard();showToast("学习记录已重置")}};
+document.querySelector("#reset-progress").onclick=()=>{if(confirm("确定要清除全部学习记录吗？此操作无法撤销。")){state=structuredClone(defaultState);saveState({replaceCloud:true});document.querySelector("#settings-modal").classList.remove("active");renderDashboard();showToast("学习记录已重置")}};
 document.querySelector("#start-session").onclick=openSession;document.querySelector("#close-session").onclick=()=>{if(confirm("要先退出吗？已经完成的单词会保留进度。"))closeSession()};
 document.querySelector("#word-search").addEventListener("input",()=>{libraryLimit=100;renderLibrary()});document.querySelector("#category-filters").addEventListener("click",e=>{if(e.target.dataset.category){activeCategory=e.target.dataset.category;libraryLimit=100;renderLibrary()}});
 document.querySelector("#word-list").addEventListener("click",e=>{if(e.target.id==="load-more"){libraryLimit+=100;renderLibrary()}});
 document.addEventListener("click",e=>{const button=e.target.closest("[data-speak]");if(button){e.preventDefault();e.stopPropagation();speakWord(button.dataset.speak)}});
 document.addEventListener("keydown",e=>{if(e.key!=="Enter"||e.repeat||!session||!document.querySelector("#session-overlay").classList.contains("active"))return;const next=document.querySelector("#next-word")||document.querySelector("#to-spelling")||document.querySelector("#finish-session");if(next){e.preventDefault();next.click()}});
 document.querySelector("#settings-modal").addEventListener("click",e=>{if(e.target.id==="settings-modal")e.currentTarget.classList.remove("active")});
+document.querySelector("#auth-modal").addEventListener("click",e=>{if(e.target.id==="auth-modal")e.currentTarget.classList.remove("active")});
 
-renderDashboard();renderLibrary();renderProgress();
+renderDashboard();renderLibrary();renderProgress();initAuth();

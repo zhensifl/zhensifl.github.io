@@ -24,17 +24,20 @@
       </nav>
       <div class="sidebar-bottom">
         <button class="nav-item" data-action="open-settings"><span class="nav-icon">⚙</span><span>学习设置</span></button>
-        <div class="profile-card">
-          <div class="avatar">Hi</div>
-          <div><strong>英语重启计划</strong><small id="profile-streak">连续学习 0 天</small></div>
-        </div>
+        <button class="profile-card account-entry" data-action="open-auth">
+          <div class="avatar" id="profile-avatar">Hi</div>
+          <div><strong id="profile-name">登录并同步</strong><small id="profile-streak">连续学习 0 天</small></div>
+        </button>
       </div>
     </aside>
 
     <main class="main-content">
       <header class="mobile-header">
         <a class="brand" href="#"><span class="brand-mark">W</span><span>WordStep</span></a>
-        <button class="icon-button" data-action="open-settings" aria-label="打开设置">⚙</button>
+        <div class="mobile-header-actions">
+          <button class="icon-button account-icon" data-action="open-auth" aria-label="登录和同步">☁</button>
+          <button class="icon-button" data-action="open-settings" aria-label="打开设置">⚙</button>
+        </div>
       </header>
 
       <section id="home-view" class="view active">
@@ -123,6 +126,13 @@
       <div class="setting-note"><span>◷</span><div><strong>预计每天 <span id="estimated-time">10</span> 分钟</strong><p>复习数量由遗忘曲线自动计算，不计入新词上限。</p></div></div>
       <button class="primary-button full" id="save-settings">保存设置</button>
       <button class="text-button danger" id="reset-progress">重置全部学习记录</button>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="auth-modal" aria-hidden="true">
+    <div class="modal auth-modal-card">
+      <button class="modal-close" data-action="close-auth" aria-label="关闭">×</button>
+      <div id="auth-content"></div>
     </div>
   </div>
 
