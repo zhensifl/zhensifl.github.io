@@ -92,6 +92,7 @@ const WORDS = [...CURATED_WORDS,...(window.WORD_DATA||[])].map((word,index)=>({.
 
 const STORAGE_KEY = "wordstep-state-v1";
 const AUTH_STORAGE_KEY = "wordstep-auth-v1";
+const APP_VERSION = "20260807-1615";
 const SUPABASE_URL = "https://wgvxdzwrvgktcidmofit.supabase.co";
 const SUPABASE_KEY = "sb_publishable_O2PaZM-nTJKAaeUYKiXbBw_r4WmllMx";
 const DAY = 86400000;
@@ -211,6 +212,7 @@ async function logoutAccount(){
 async function initAuth(){
   renderAccountUI();if(!authSession)return;syncStatus="正在连接云端…";renderAccountUI();const valid=await ensureSession();if(valid)await syncProgress();else renderAccountUI()
 }
+async function checkForAppUpdate(){if(session)return;try{const response=await fetch(`version.json?t=${Date.now()}`,{cache:"no-store"});if(!response.ok)return;const remote=await response.json();if(remote.version&&remote.version!==APP_VERSION){const url=new URL(location.href);url.searchParams.set("_wv",remote.version);location.replace(url.href)}}catch{}}
 
 function renderDashboard(){
   const due=dueWords().length, fresh=Math.min(newAllowance(),unseenWords().length), weak=weakWords().length, total=due+fresh;
@@ -299,7 +301,7 @@ document.addEventListener("click",e=>{const button=e.target.closest("[data-speak
 document.addEventListener("keydown",e=>{if(e.key!=="Enter"||e.repeat||!session||!document.querySelector("#session-overlay").classList.contains("active"))return;const next=document.querySelector("#next-word")||document.querySelector("#to-spelling")||document.querySelector("#finish-session");if(next){e.preventDefault();next.click()}});
 document.querySelector("#settings-modal").addEventListener("click",e=>{if(e.target.id==="settings-modal")e.currentTarget.classList.remove("active")});
 document.querySelector("#auth-modal").addEventListener("click",e=>{if(e.target.id==="auth-modal")e.currentTarget.classList.remove("active")});
-document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&authSession)syncProgress()});
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){if(authSession)syncProgress();checkForAppUpdate()}});
 window.addEventListener("online",()=>{if(authSession)syncProgress()});
 
-renderDashboard();renderLibrary();renderProgress();initAuth();
+renderDashboard();renderLibrary();renderProgress();initAuth();checkForAppUpdate();
