@@ -283,5 +283,7 @@ document.addEventListener("click",e=>{const button=e.target.closest("[data-speak
 document.addEventListener("keydown",e=>{if(e.key!=="Enter"||e.repeat||!session||!document.querySelector("#session-overlay").classList.contains("active"))return;const next=document.querySelector("#next-word")||document.querySelector("#to-spelling")||document.querySelector("#finish-session");if(next){e.preventDefault();next.click()}});
 document.querySelector("#settings-modal").addEventListener("click",e=>{if(e.target.id==="settings-modal")e.currentTarget.classList.remove("active")});
 document.querySelector("#auth-modal").addEventListener("click",e=>{if(e.target.id==="auth-modal")e.currentTarget.classList.remove("active")});
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&authSession)syncProgress()});
+window.addEventListener("online",()=>{if(authSession)syncProgress()});
 
 renderDashboard();renderLibrary();renderProgress();initAuth();
