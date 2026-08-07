@@ -79,7 +79,16 @@ const CURATED_WORDS = [
   ["opportunity","机会","This is a great opportunity.","这是一个很好的机会。","协作反馈","/ˌɑːpərˈtuːnəti/"],
 ].map(w=>({en:w[0],zh:w[1],example:w[2],exampleZh:w[3],category:w[4],phonetic:w[5]}));
 
-const WORDS = [...CURATED_WORDS,...(window.WORD_DATA||[])].map((word,index)=>({...word,id:index+1}));
+const CURATED_POS = {
+  morning:"n.",breakfast:"n.",kitchen:"n.",clean:"v./adj.",laundry:"n.",neighbor:"n.",comfortable:"adj.",prepare:"v.",repair:"v.",quiet:"adj.",towel:"n.",blanket:"n.",
+  order:"n./v.",menu:"n.",delicious:"adj.",hungry:"adj.",bill:"n.",cash:"n.",price:"n.",cheap:"adj.",expensive:"adj.",receipt:"n.",change:"n./v.",available:"adj.",
+  station:"n.",ticket:"n.",direction:"n.",straight:"adj./adv.",corner:"n.",traffic:"n.",arrive:"v.",leave:"v.",nearby:"adj./adv.",entrance:"n.",delay:"n./v.",platform:"n.",
+  introduce:"v.",invite:"v.",message:"n./v.",together:"adv.",interesting:"adj.",hobby:"n.",weekend:"n.",remember:"v.",understand:"v.",probably:"adv.",agree:"v.",suggest:"v.",
+  meeting:"n.",schedule:"n./v.",deadline:"n.",project:"n.",task:"n.",report:"n./v.",update:"n./v.",explain:"v.",discuss:"v.",confirm:"v.",forward:"v./adv.",attach:"v.",
+  progress:"n.",problem:"n.",solution:"n.",support:"n./v.",improve:"v.",feedback:"n.",responsible:"adj.",priority:"n.",complete:"v./adj.",expect:"v.",decision:"n.",opportunity:"n."
+};
+const DICTIONARY_BY_EN = new Map((window.WORD_DATA||[]).map(word=>[word.en.toLowerCase(),word]));
+const WORDS = [...CURATED_WORDS,...(window.WORD_DATA||[])].map((word,index)=>({...word,pos:partOfSpeech(word),id:index+1}));
 
 const STORAGE_KEY = "wordstep-state-v1";
 const AUTH_STORAGE_KEY = "wordstep-auth-v1";
@@ -104,6 +113,13 @@ let authMessage = "";
 
 function localDate(d=new Date()){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0");return `${y}-${m}-${day}`}
 function dayStart(d=new Date()){return new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime()}
+function extractPartOfSpeech(meaning=""){const found=[...meaning.matchAll(/(?:^|；)\s*(art|aux|conj|interj|num|prep|pron|adv|adj|a|vt|vi|v|n|pl)\./gi)].map(match=>({a:"adj",vt:"v",vi:"v",pl:"n"}[match[1].toLowerCase()]||match[1].toLowerCase()));return [...new Set(found)].map(pos=>`${pos}.`).join("/")}
+function inferredPartOfSpeech(word){const en=word.en.toLowerCase();if(["the","a","an"].includes(en))return "art.";if(["i","you","he","she","it","we","they","me","him","her","us","them","this","that","these","those","who","what","which"].includes(en))return "pron.";if(["and","or","but","if","because","when","while","although"].includes(en))return "conj.";if(["in","on","at","to","for","from","with","by","about","into","over","after","before"].includes(en))return "prep.";if(["can","could","may","might","must","should","would","will"].includes(en))return "aux.";if(en.endsWith("ly"))return "adv.";if(/(tion|sion|ment|ness|ity|ship|ance|ence|er|or)$/.test(en))return "n.";if(/(ous|ful|less|able|ible|ive|al|ic|ish|ary)$/.test(en)||/的(?:；|$)/.test(word.zh))return "adj.";return "v."}
+function partOfSpeech(word){return CURATED_POS[word.en.toLowerCase()]||extractPartOfSpeech(word.zh)||extractPartOfSpeech(DICTIONARY_BY_EN.get(word.en.toLowerCase())?.zh)||inferredPartOfSpeech(word)}
+function cleanMeaning(meaning=""){return meaning.replace(/(^|；)\s*(?:art|aux|conj|interj|num|prep|pron|adv|adj|a|vt|vi|v|n|pl)\.\s*/gi,"$1").trim()}
+function conciseMeaning(meaning=""){const parts=cleanMeaning(meaning).replace(/\r?\n/g," ").replace(/\[[^\]]*\]/g,"").split(/[；;]/).filter(Boolean).slice(0,2).map(part=>part.split(/[,，]/).filter(Boolean).slice(0,2).join("、"));const result=parts.join("；");return result.length>36?`${result.slice(0,35)}…`:result}
+function meaningWithPartOfSpeech(word){return `${word.pos} ${conciseMeaning(word.zh)}`}
+function choiceExample(word){if(word.example)return {en:word.example,zh:word.exampleZh||"结合语境理解这个单词。"};return {en:`The word “${word.en}” is useful in everyday conversation.`,zh:`这是“${word.category}”场景中的常用表达。`}}
 function loadState(){try{return {...defaultState,...JSON.parse(localStorage.getItem(STORAGE_KEY)||"{}")}}catch{return structuredClone(defaultState)}}
 function persistLocalState(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}
 function saveState({replaceCloud=false}={}){state.updatedAt=Date.now();persistLocalState();if(replaceCloud)replaceCloudOnNextSync=true;scheduleCloudSync()}
@@ -228,7 +244,7 @@ function renderProgress(){
 
 function switchView(name){document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id===`${name}-view`));document.querySelectorAll(".nav-item[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===name));if(name==="library")renderLibrary();if(name==="progress")renderProgress();window.scrollTo(0,0)}
 function shuffle(a){return [...a].sort(()=>Math.random()-.5)}
-function distractors(word, field){return shuffle(WORDS.filter(w=>w.id!==word.id&&w.category===word.category)).slice(0,3).map(w=>w[field])}
+function distractorWords(word){return shuffle(WORDS.filter(w=>w.id!==word.id&&w.en!==word.en&&w.category===word.category&&conciseMeaning(w.zh)!==conciseMeaning(word.zh))).slice(0,3)}
 function openSession(){
   let queue=todayQueue(),isExtra=false;if(!queue.length){queue=weakWords().slice(0,Math.max(5,state.dailyGoal));isExtra=true}if(!queue.length){showToast("全部词汇都完成了，太棒了！");return}
   session={queue,idx:0,phase:"choice",correct:0,errors:0,unknowns:0,isExtra,currentHadError:false,currentErrorCount:0,currentUnknown:false,forceCorrection:false};
@@ -238,16 +254,16 @@ function currentWord(){return session.queue[session.idx]}
 function renderQuestion(){
   const w=currentWord(),progress=(session.idx/session.queue.length)*100;document.querySelector("#session-progress-bar").style.width=`${progress}%`;document.querySelector("#session-step").textContent=`${session.idx+1} / ${session.queue.length}`;
   if(session.phase==="choice"){
-    const reverse=(w.id+session.idx)%2===0,field=reverse?"en":"zh",question=reverse?w.zh:w.en,answers=shuffle([w[field],...distractors(w,field)]);
-    document.querySelector("#study-card").innerHTML=`<span class="question-type">${reverse?"中文 → 英文":"英文 → 中文"}</span><div class="question-word-row"><h2 class="question-main ${reverse?"chinese":""}">${question}</h2>${reverse?"":`<button class="speak-button large" data-speak="${escapeAttr(w.en)}" aria-label="朗读 ${escapeAttr(w.en)}">🔊</button>`}</div>${reverse?"":`<span class="phonetic">${w.phonetic}</span>`}<p class="question-note">选择正确含义，然后完成拼写</p><div class="choice-grid">${answers.map(a=>`<button class="choice" data-answer="${escapeAttr(a)}">${a}</button>`).join("")}</div><div class="choice-unknown-wrap"><button class="unknown-button" id="choice-unknown" type="button">不认识这个词</button></div><div id="choice-feedback"></div>`;
-    document.querySelectorAll(".choice").forEach(btn=>btn.addEventListener("click",()=>answerChoice(btn,w[field],field==="en"?w.en:"")));
-    document.querySelector("#choice-unknown").onclick=()=>markChoiceUnknown(w[field],field==="en"?w.en:"");
+    const reverse=(w.id+session.idx)%2===0,field=reverse?"en":"zh",question=reverse?meaningWithPartOfSpeech(w):w.en,options=shuffle([w,...distractorWords(w)]),example=choiceExample(w),correctLabel=field==="zh"?meaningWithPartOfSpeech(w):w.en;
+    document.querySelector("#study-card").innerHTML=`<span class="question-type">${reverse?"中文 → 英文":"英文 → 中文"}</span><div class="question-word-row"><h2 class="question-main ${reverse?"chinese":""}">${escapeAttr(question)}</h2>${reverse?"":`<button class="speak-button large" data-speak="${escapeAttr(w.en)}" aria-label="朗读 ${escapeAttr(w.en)}">🔊</button>`}</div>${reverse?"":`<span class="phonetic">${escapeAttr(w.phonetic)}</span><div class="choice-example"><p>${escapeAttr(example.en)}</p><small>${escapeAttr(example.zh)}</small></div>`}<p class="question-note">选择正确含义，然后完成拼写</p><div class="choice-grid">${options.map(option=>field==="zh"?`<button class="choice meaning-choice" data-answer="${option.id}"><span class="choice-pos">${escapeAttr(option.pos)}</span><span>${escapeAttr(conciseMeaning(option.zh))}</span></button>`:`<button class="choice" data-answer="${option.id}">${escapeAttr(option.en)}</button>`).join("")}</div><div class="choice-unknown-wrap"><button class="unknown-button" id="choice-unknown" type="button">不认识这个词</button></div><div id="choice-feedback"></div>`;
+    document.querySelectorAll(".choice").forEach(btn=>btn.addEventListener("click",()=>answerChoice(btn,String(w.id),correctLabel,field==="en"?w.en:"")));
+    document.querySelector("#choice-unknown").onclick=()=>markChoiceUnknown(String(w.id),correctLabel,field==="en"?w.en:"");
   }else renderSpelling();
 }
 function lockChoice(answer){document.querySelectorAll(".choice").forEach(b=>{b.disabled=true;if(b.dataset.answer===answer)b.classList.add("correct")});const unknown=document.querySelector("#choice-unknown");if(unknown)unknown.disabled=true}
-function choiceFeedback({correct,answer,speakText,unknown=false}){document.querySelector("#choice-feedback").innerHTML=`<div class="feedback ${correct?"success":"error"}"><strong>${unknown?"已标记为不认识，正确答案：":correct?"答对了！":"记一下正确答案："} ${answer}</strong><div class="feedback-actions">${speakText?`<button class="speak-button" data-speak="${escapeAttr(speakText)}" aria-label="朗读 ${escapeAttr(speakText)}">🔊</button>`:""}<button class="continue-button" id="to-spelling">继续拼写 →</button></div></div>`;document.querySelector("#to-spelling").onclick=()=>{session.phase="spelling";renderQuestion()}}
-function answerChoice(btn,answer,speakText){const correct=btn.dataset.answer===answer;lockChoice(answer);if(!correct){btn.classList.add("wrong");session.errors++;session.currentErrorCount++;session.currentHadError=true}choiceFeedback({correct,answer,speakText})}
-function markChoiceUnknown(answer,speakText){lockChoice(answer);session.errors++;session.unknowns++;session.currentErrorCount+=2;session.currentHadError=true;session.currentUnknown=true;session.forceCorrection=true;choiceFeedback({correct:false,answer,speakText,unknown:true})}
+function choiceFeedback({correct,answer,speakText,unknown=false}){document.querySelector("#choice-feedback").innerHTML=`<div class="feedback ${correct?"success":"error"}"><strong>${unknown?"已标记为不认识，正确答案：":correct?"答对了！":"记一下正确答案："} ${escapeAttr(answer)}</strong><div class="feedback-actions">${speakText?`<button class="speak-button" data-speak="${escapeAttr(speakText)}" aria-label="朗读 ${escapeAttr(speakText)}">🔊</button>`:""}<button class="continue-button" id="to-spelling">继续拼写 →</button></div></div>`;document.querySelector("#to-spelling").onclick=()=>{session.phase="spelling";renderQuestion()}}
+function answerChoice(btn,answerId,answer,speakText){const correct=btn.dataset.answer===answerId;lockChoice(answerId);if(!correct){btn.classList.add("wrong");session.errors++;session.currentErrorCount++;session.currentHadError=true}choiceFeedback({correct,answer,speakText})}
+function markChoiceUnknown(answerId,answer,speakText){lockChoice(answerId);session.errors++;session.unknowns++;session.currentErrorCount+=2;session.currentHadError=true;session.currentUnknown=true;session.forceCorrection=true;choiceFeedback({correct:false,answer,speakText,unknown:true})}
 function renderSpelling(){const w=currentWord(),clue=w.example?w.example.replace(new RegExp(w.en,"i"),"______"):`场景 · ${w.category}　根据中文含义拼写英文`;document.querySelector("#study-card").innerHTML=`<span class="question-type">拼写练习 · 必须拼对才能继续</span><h2 class="question-main chinese">${w.zh}</h2><p class="question-note">${clue}</p><form class="spell-form" id="spell-form"><input class="spell-input" id="spell-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="输入英文单词" aria-label="输入英文拼写"><div class="spell-actions"><button class="primary-button" type="submit">检查拼写</button><button class="unknown-button" id="spell-unknown" type="button">不认识</button></div><div id="spell-feedback" aria-live="polite"></div></form>`;const input=document.querySelector("#spell-input");input.focus();document.querySelector("#spell-form").onsubmit=e=>{e.preventDefault();checkSpelling(input.value)};document.querySelector("#spell-unknown").onclick=markSpellingUnknown }
 function showSpellingCorrection(){const w=currentWord(),input=document.querySelector("#spell-input");input.classList.add("error");input.value="";input.placeholder="看一遍答案，再重新输入";document.querySelector("#spell-feedback").innerHTML=`<div class="correction-box">正确拼写是<div class="correction-word"><strong>${w.en}</strong><button type="button" class="speak-button" data-speak="${escapeAttr(w.en)}" aria-label="朗读 ${escapeAttr(w.en)}">🔊</button></div>请重新完整输入一次，拼对后才能继续。</div>`;input.focus()}
 function markSpellingUnknown(){if(!session.currentUnknown){session.errors++;session.unknowns++;session.currentErrorCount+=2;session.currentHadError=true;session.currentUnknown=true}session.forceCorrection=true;const button=document.querySelector("#spell-unknown");if(button)button.disabled=true;showSpellingCorrection()}
@@ -266,7 +282,7 @@ function finishWord(){
 }
 function renderComplete(){document.querySelector("#session-progress-bar").style.width="100%";document.querySelector("#session-step").textContent="完成";document.querySelector("#study-card").innerHTML=`<div class="completion-icon">✓</div><span class="question-type">TODAY COMPLETE</span><h2 class="question-main chinese">今天的训练完成了！</h2><p class="question-note">记忆不靠一次记住，而靠每次及时回来。</p><div class="completion-stats"><div><strong>${session.queue.length}</strong><span>完成词数</span></div><div><strong>${session.correct}</strong><span>正确拼写</span></div><div><strong>${session.errors}</strong><span>纠正次数</span></div></div><button class="primary-button" id="finish-session">返回首页</button>`;document.querySelector("#finish-session").onclick=closeSession}
 function closeSession(){document.querySelector("#session-overlay").classList.remove("active");document.querySelector("#session-overlay").setAttribute("aria-hidden","true");session=null;renderDashboard();renderProgress()}
-function escapeAttr(s){return String(s).replaceAll("&","&amp;").replaceAll('"',"&quot;").replaceAll("<","&lt;")}
+function escapeAttr(s){return String(s).replaceAll("&","&amp;").replaceAll('"',"&quot;").replaceAll("'","&#39;").replaceAll("<","&lt;").replaceAll(">","&gt;")}
 
 document.querySelectorAll(".nav-item[data-view]").forEach(b=>b.addEventListener("click",()=>switchView(b.dataset.view)));
 document.querySelectorAll('[data-action="open-settings"]').forEach(b=>b.addEventListener("click",()=>{document.querySelector("#daily-range").value=state.dailyGoal;updateRange();document.querySelector("#settings-modal").classList.add("active")}));
