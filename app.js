@@ -87,12 +87,26 @@ const CURATED_POS = {
   meeting:"n.",schedule:"n./v.",deadline:"n.",project:"n.",task:"n.",report:"n./v.",update:"n./v.",explain:"v.",discuss:"v.",confirm:"v.",forward:"v./adv.",attach:"v.",
   progress:"n.",problem:"n.",solution:"n.",support:"n./v.",improve:"v.",feedback:"n.",responsible:"adj.",priority:"n.",complete:"v./adj.",expect:"v.",decision:"n.",opportunity:"n."
 };
+const TOO_BASIC_WORDS = new Set(`
+  the a an this that these those i me my mine you your yours he him his she her hers it its we us our ours they them their theirs
+  who whom whose what which am is are was were be been being have has had having do does did done doing
+  can could may might must shall should will would and or but if because so as than though although while whether
+  to of in on at for from by with about into onto over under above below after before between through during without within against among around
+  not no yes all any some each every either neither both another other one two three four five six seven eight nine ten
+  here there now then very too only just also up down out off more most much many few little
+  myself yourself himself herself itself ourselves themselves whoever whatever maybe
+  car cat dog man woman boy girl child children mother father mom dad brother sister book pen pencil table chair door window room house home school
+  red blue green black white big small good bad new old hot cold day night week month year water food milk tea name
+  go come get give take make say tell see look know think want like love eat drink sleep sit stand walk run read write
+`.trim().split(/\s+/));
+const GENERATED_BASIC_SKIP = 400;
 const DICTIONARY_BY_EN = new Map((window.WORD_DATA||[]).map(word=>[word.en.toLowerCase(),word]));
-const WORDS = [...CURATED_WORDS,...(window.WORD_DATA||[])].map((word,index)=>({...word,pos:partOfSpeech(word),id:index+1}));
+const ALL_WORDS = [...CURATED_WORDS,...(window.WORD_DATA||[])].map((word,index)=>({...word,pos:partOfSpeech(word),id:index+1,isCurated:index<CURATED_WORDS.length}));
+const WORDS = ALL_WORDS.filter(word=>word.isCurated||(word.id>CURATED_WORDS.length+GENERATED_BASIC_SKIP&&!TOO_BASIC_WORDS.has(word.en.toLowerCase()))).slice(0,5000);
 
 const STORAGE_KEY = "wordstep-state-v1";
 const AUTH_STORAGE_KEY = "wordstep-auth-v1";
-const APP_VERSION = "20260807-1615";
+const APP_VERSION = "20260811-2";
 const SUPABASE_URL = "https://wgvxdzwrvgktcidmofit.supabase.co";
 const SUPABASE_KEY = "sb_publishable_O2PaZM-nTJKAaeUYKiXbBw_r4WmllMx";
 const DAY = 86400000;
