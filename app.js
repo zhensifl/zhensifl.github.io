@@ -106,7 +106,7 @@ const WORDS = ALL_WORDS.filter(word=>word.isCurated||(word.id>CURATED_WORDS.leng
 
 const STORAGE_KEY = "wordstep-state-v1";
 const AUTH_STORAGE_KEY = "wordstep-auth-v1";
-const APP_VERSION = "20260812-1";
+const APP_VERSION = "20260812-2";
 const SUPABASE_URL = "https://wgvxdzwrvgktcidmofit.supabase.co";
 const SUPABASE_KEY = "sb_publishable_O2PaZM-nTJKAaeUYKiXbBw_r4WmllMx";
 const DAY = 86400000;
@@ -133,24 +133,28 @@ function inferredPartOfSpeech(word){const en=word.en.toLowerCase();if(["the","a"
 function partOfSpeech(word){return CURATED_POS[word.en.toLowerCase()]||extractPartOfSpeech(word.zh)||extractPartOfSpeech(DICTIONARY_BY_EN.get(word.en.toLowerCase())?.zh)||inferredPartOfSpeech(word)}
 function cleanMeaning(meaning=""){return meaning.replace(/(^|；)\s*(?:art|aux|conj|interj|num|prep|pron|adv|adj|a|vt|vi|v|n|pl)\.\s*/gi,"$1").trim()}
 function conciseMeaning(meaning=""){const parts=cleanMeaning(meaning).replace(/\r?\n/g," ").replace(/\[[^\]]*\]/g,"").split(/[；;]/).filter(Boolean).slice(0,2).map(part=>part.split(/[,，]/).filter(Boolean).slice(0,2).join("、"));const result=parts.join("；");return result.length>36?`${result.slice(0,35)}…`:result}
+function primaryMeaning(word){const value=cleanMeaning(word.zh).replace(/\r?\n/g," ").replace(/\[[^\]]*\]/g,"").split(/[；;,，]/).map(part=>part.trim()).find(Boolean)||word.category;return value.length>18?`${value.slice(0,17)}…`:value}
 function meaningWithPartOfSpeech(word){return `${word.pos} ${conciseMeaning(word.zh)}`}
 function capitalize(value=""){return value.charAt(0).toUpperCase()+value.slice(1)}
 const IRREGULAR_FORMS=new Set(["taken","given","written","spoken","broken","chosen","driven","eaten","fallen","forgotten","frozen","grown","known","shown","thrown","worn","said","made","built","bought","brought","caught","found","thought","sent","left","lost","kept","felt","held","paid","sold","told","won","done","gone","seen","been"]);
 function exampleFor(word){
-  if(word.example)return {en:word.example,zh:word.exampleZh||`语境提示：${conciseMeaning(word.zh)}`};
-  const en=word.en,meaning=conciseMeaning(word.zh),pos=word.pos||"";let sentence;
-  if(pos.includes("num."))sentence=`The report included “${en}” as an important number.`;
-  else if(pos.includes("n."))sentence=`We talked about the ${en} during the meeting.`;
-  else if(pos.includes("adj."))sentence=`The situation seems ${en} to everyone.`;
-  else if(pos.includes("adv."))sentence=en.endsWith("ly")?`She handled the situation ${en}.`:`We discussed when to use “${en}”.`;
+  if(word.example&&word.exampleZh)return {en:word.example,zh:word.exampleZh};
+  const en=word.en,meaning=primaryMeaning(word),pos=word.pos||"";let sentence,translation;
+  if(pos.includes("num.")){sentence=`The report included “${en}” as an important number.`;translation=`报告把“${meaning}”列为一个重要数字。`}
+  else if(pos.includes("n.")){sentence=`We talked about the ${en} during the meeting.`;translation=`我们在会议中讨论了“${meaning}”。`}
+  else if(pos.includes("adj.")){sentence=`The situation seems ${en} to everyone.`;translation=`对大家来说，这种情况似乎“${meaning}”。`}
+  else if(pos.includes("adv.")){
+    if(en.endsWith("ly")){sentence=`She handled the situation ${en}.`;translation=`她“${meaning}”地处理了这种情况。`}
+    else{sentence=`We discussed when to use “${en}”.`;translation=`我们讨论了什么时候使用“${en}（${meaning}）”。`}
+  }
   else if(pos.includes("v.")){
-    if(en.endsWith("ing"))sentence=`${capitalize(en)} requires time and careful attention.`;
-    else if(en.endsWith("ed"))sentence=`The team ${en} the issue during the meeting.`;
-    else if(IRREGULAR_FORMS.has(en))sentence=`We reviewed how “${en}” is used in this sentence.`;
-    else if(en.endsWith("s")&&!en.endsWith("ss"))sentence=`She ${en} this task every day.`;
-    else sentence=`We need to ${en} this before tomorrow.`;
-  }else sentence=`We discussed “${en}” in today's conversation.`;
-  return {en:sentence,zh:`语境提示：${meaning||word.category}`};
+    if(en.endsWith("ing")){sentence=`${capitalize(en)} requires time and careful attention.`;translation=`“${meaning}”需要时间和认真投入。`}
+    else if(en.endsWith("ed")){sentence=`The team ${en} the issue during the meeting.`;translation=`团队在会议中“${meaning}”了这个问题。`}
+    else if(IRREGULAR_FORMS.has(en)){sentence=`We reviewed how “${en}” is used in this sentence.`;translation=`我们复习了“${en}（${meaning}）”在这个句子中的用法。`}
+    else if(en.endsWith("s")&&!en.endsWith("ss")){sentence=`She ${en} this task every day.`;translation=`她每天都“${meaning}”这项任务。`}
+    else{sentence=`We need to ${en} this before tomorrow.`;translation=`我们需要在明天之前“${meaning}”这件事。`}
+  }else{sentence=`We discussed “${en}” in today's conversation.`;translation=`我们在今天的对话中讨论了“${en}（${meaning}）”。`}
+  return {en:sentence,zh:translation};
 }
 function clozeExample(word){const example=exampleFor(word),escaped=word.en.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");return {...example,en:example.en.replace(new RegExp(`\\b${escaped}(?:s|es|ed|ing)?\\b`,"ig"),"______")}}
 function loadState(){try{return {...defaultState,...JSON.parse(localStorage.getItem(STORAGE_KEY)||"{}")}}catch{return structuredClone(defaultState)}}
