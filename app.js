@@ -106,7 +106,7 @@ const WORDS = ALL_WORDS.filter(word=>word.isCurated||(word.id>CURATED_WORDS.leng
 
 const STORAGE_KEY = "wordstep-state-v1";
 const AUTH_STORAGE_KEY = "wordstep-auth-v1";
-const APP_VERSION = "20260811-4";
+const APP_VERSION = "20260812-1";
 const SUPABASE_URL = "https://wgvxdzwrvgktcidmofit.supabase.co";
 const SUPABASE_KEY = "sb_publishable_O2PaZM-nTJKAaeUYKiXbBw_r4WmllMx";
 const DAY = 86400000;
@@ -187,13 +187,30 @@ function newAllowance(){return Math.max(0,state.dailyGoal-learnedToday())}
 function todayQueue(){return [...dueWords(),...unseenWords().slice(0,newAllowance())]}
 function streak(){const days=Object.keys(state.activity).filter(k=>state.activity[k]?.completed>0).sort().reverse();if(!days.length)return 0;let cursor=dayStart(),count=0;const today=localDate();if(days[0]!==today)cursor-=DAY;while(days.includes(localDate(new Date(cursor)))){count++;cursor-=DAY}return count}
 function showToast(text){const el=document.querySelector("#toast");el.textContent=text;el.classList.add("show");setTimeout(()=>el.classList.remove("show"),2200)}
-function speakWord(text){
-  if(!("speechSynthesis" in window)){showToast("当前浏览器不支持语音播放");return}
-  window.speechSynthesis.cancel();
-  const utterance=new SpeechSynthesisUtterance(text);utterance.lang="en-US";utterance.rate=.78;utterance.pitch=1;
-  const voices=window.speechSynthesis.getVoices();utterance.voice=voices.find(v=>v.lang==="en-US")||voices.find(v=>v.lang.startsWith("en"))||null;
-  window.speechSynthesis.speak(utterance);
+let activeUtterance=null,activeSpeechText="",speechRequestId=0,speechStartTimer=null,lastSpeechClick=0,englishVoices=[];
+function refreshEnglishVoices(){if(!("speechSynthesis" in window))return [];englishVoices=window.speechSynthesis.getVoices().filter(voice=>voice.lang?.toLowerCase().startsWith("en"));return englishVoices}
+function preferredEnglishVoice(){const voices=refreshEnglishVoices();return voices.find(voice=>voice.localService&&voice.lang.toLowerCase()==="en-us")||voices.find(voice=>voice.localService)||voices.find(voice=>voice.lang.toLowerCase()==="en-us")||voices[0]||null}
+function updateSpeechButtons(text,status="idle"){
+  document.querySelectorAll("[data-speak]").forEach(button=>{if(button.dataset.speak!==text)return;button.classList.toggle("speaking",status==="speaking");button.classList.toggle("speech-pending",status==="pending");button.classList.toggle("speech-error",status==="error");button.setAttribute("aria-busy",String(status==="pending"||status==="speaking"));button.textContent=status==="pending"?"…":status==="speaking"?"🔉":"🔊";button.title=status==="pending"?"正在准备发音":status==="speaking"?"正在播放":status==="error"?"播放失败，点击重试":"点击发音"});
 }
+function finishSpeech(requestId,status="idle"){if(requestId!==speechRequestId)return;clearTimeout(speechStartTimer);updateSpeechButtons(activeSpeechText,status);activeUtterance=null;if(status==="idle")activeSpeechText=""}
+function speakWord(text){
+  if(!("speechSynthesis" in window)||!("SpeechSynthesisUtterance" in window)){showToast("当前浏览器不支持语音播放，请换用 Safari、Chrome 或 Edge");return}
+  const synth=window.speechSynthesis,now=Date.now();
+  if(activeSpeechText===text&&(synth.speaking||synth.pending)&&now-lastSpeechClick<1400){lastSpeechClick=now;if(synth.paused)synth.resume();updateSpeechButtons(text,"speaking");return}
+  lastSpeechClick=now;const requestId=++speechRequestId;clearTimeout(speechStartTimer);if(activeSpeechText)updateSpeechButtons(activeSpeechText,"idle");activeSpeechText=text;updateSpeechButtons(text,"pending");synth.cancel();
+  const begin=attempt=>{
+    if(requestId!==speechRequestId)return;
+    let started=false;const utterance=new SpeechSynthesisUtterance(text);activeUtterance=utterance;utterance.lang="en-US";utterance.rate=attempt?0.82:0.78;utterance.pitch=1;utterance.volume=1;utterance.voice=preferredEnglishVoice();
+    utterance.onstart=()=>{if(requestId!==speechRequestId)return;started=true;clearTimeout(speechStartTimer);updateSpeechButtons(text,"speaking")};
+    utterance.onend=()=>finishSpeech(requestId);
+    utterance.onerror=event=>{if(requestId!==speechRequestId||["canceled","interrupted"].includes(event.error))return;if(!attempt){clearTimeout(speechStartTimer);setTimeout(()=>begin(1),120)}else{finishSpeech(requestId,"error");showToast("发音没有播放，请检查媒体音量后再点一次")}};
+    try{if(synth.paused)synth.resume();synth.speak(utterance)}catch{if(!attempt)setTimeout(()=>begin(1),120);else{finishSpeech(requestId,"error");showToast("发音启动失败，请刷新页面后重试")}}
+    speechStartTimer=setTimeout(()=>{if(requestId!==speechRequestId||started)return;synth.cancel();if(!attempt)setTimeout(()=>begin(1),120);else{finishSpeech(requestId,"error");showToast("语音引擎暂未响应，请检查媒体音量后重试")}},1800);
+  };
+  begin(0);
+}
+if("speechSynthesis" in window){refreshEnglishVoices();window.speechSynthesis.addEventListener?.("voiceschanged",refreshEnglishVoices)}
 
 function authErrorText(message=""){
   const text=message.toLowerCase();
@@ -333,7 +350,7 @@ document.addEventListener("click",e=>{const button=e.target.closest("[data-speak
 document.addEventListener("keydown",e=>{if(e.key!=="Enter"||e.repeat||!session||!document.querySelector("#session-overlay").classList.contains("active"))return;const next=document.querySelector("#next-word")||document.querySelector("#to-spelling")||document.querySelector("#finish-session");if(next){e.preventDefault();next.click()}});
 document.querySelector("#settings-modal").addEventListener("click",e=>{if(e.target.id==="settings-modal")e.currentTarget.classList.remove("active")});
 document.querySelector("#auth-modal").addEventListener("click",e=>{if(e.target.id==="auth-modal")e.currentTarget.classList.remove("active")});
-document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){if(authSession)syncProgress();checkForAppUpdate()}});
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){refreshEnglishVoices();if(authSession)syncProgress();checkForAppUpdate()}else if("speechSynthesis" in window){window.speechSynthesis.cancel();finishSpeech(speechRequestId)}});
 window.addEventListener("online",()=>{if(authSession)syncProgress()});
 
 renderDashboard();renderLibrary();renderProgress();initAuth();checkForAppUpdate();
