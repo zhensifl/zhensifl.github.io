@@ -8,10 +8,11 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <title>WordStep · 日常英语词汇训练</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%231f4938'/%3E%3Ctext x='32' y='44' text-anchor='middle' font-size='38' font-family='Georgia' font-weight='700' fill='white'%3EW%3C/text%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260812-2" />
+  <link rel="stylesheet" href="styles.css?v=20260829-1" />
 </head>
 <body>
   <div class="app-shell">
@@ -123,7 +124,7 @@
     <div class="modal">
       <button class="modal-close" data-action="close-settings">×</button>
       <span class="eyebrow">LEARNING SETTINGS</span><h2>学习设置</h2><p>选择一个可以长期坚持的节奏，比一次学很多更重要。</p>
-      <label class="range-label"><span>每日新词数量</span><strong><span id="daily-value">10</span> 词</strong></label>
+      <label class="range-label" for="daily-range"><span>每日新词数量</span><strong><span id="daily-value">10</span> 词</strong></label>
       <input type="range" id="daily-range" min="5" max="70" step="5" value="10">
       <div class="range-marks"><span>5</span><span>20</span><span>30</span><span>40</span><span>50</span><span>60</span><span>70</span></div>
       <div class="setting-note"><span>◷</span><div><strong>预计每天 <span id="estimated-time">10</span> 分钟</strong><p>复习数量由遗忘曲线自动计算，不计入新词上限。</p></div></div>
@@ -141,7 +142,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="words-data.js?v=20260812-2"></script>
-  <script src="app.js?v=20260812-2"></script>
+  <script src="words-data.js?v=20260829-1"></script>
+  <script src="app.js?v=20260829-1"></script>
 </body>
 </html>

@@ -99,25 +99,27 @@ const TOO_BASIC_WORDS = new Set(`
   red blue green black white big small good bad new old hot cold day night week month year water food milk tea name
   go come get give take make say tell see look know think want like love eat drink sleep sit stand walk run read write
 `.trim().split(/\s+/));
+const EXCLUDED_WORDS = new Set("murder suicide".split(" "));
 const GENERATED_BASIC_SKIP = 400;
 const DICTIONARY_BY_EN = new Map((window.WORD_DATA||[]).map(word=>[word.en.toLowerCase(),word]));
 const ALL_WORDS = [...CURATED_WORDS,...(window.WORD_DATA||[])].map((word,index)=>({...word,pos:partOfSpeech(word),id:index+1,isCurated:index<CURATED_WORDS.length}));
-const WORDS = ALL_WORDS.filter(word=>word.isCurated||(word.id>CURATED_WORDS.length+GENERATED_BASIC_SKIP&&!TOO_BASIC_WORDS.has(word.en.toLowerCase()))).slice(0,5000);
+function isUsefulVocabulary(word){return !EXCLUDED_WORDS.has(word.en.toLowerCase())&&!/(?:男子名|女子名|人名|城市名|州名|国家名)/.test(word.zh)}
+const WORDS = ALL_WORDS.filter(word=>word.isCurated||(word.id>CURATED_WORDS.length+GENERATED_BASIC_SKIP&&!TOO_BASIC_WORDS.has(word.en.toLowerCase())&&isUsefulVocabulary(word))).slice(0,5000);
 
 const STORAGE_KEY = "wordstep-state-v1";
 const AUTH_STORAGE_KEY = "wordstep-auth-v1";
-const APP_VERSION = "20260812-2";
+const APP_VERSION = "20260829-1";
 const SUPABASE_URL = "https://wgvxdzwrvgktcidmofit.supabase.co";
 const SUPABASE_KEY = "sb_publishable_O2PaZM-nTJKAaeUYKiXbBw_r4WmllMx";
 const DAY = 86400000;
 const STAGE_DAYS = [1,2,4,7,15,30,60];
 const categoryNames = [...new Set(WORDS.map(w=>w.category))];
 const defaultState = {dailyGoal:10, words:{}, activity:{}, lastStudyDate:null, updatedAt:0};
-let state = loadState();
+let authSession = loadAuthSession();
+let state = loadInitialState();
 let activeCategory = "全部";
 let libraryLimit = 100;
 let session = null;
-let authSession = loadAuthSession();
 let authMode = "login";
 let syncTimer = null;
 let syncBusy = false;
@@ -125,6 +127,7 @@ let syncQueued = false;
 let replaceCloudOnNextSync = false;
 let syncStatus = "未登录 · 进度仅保存在当前设备";
 let authMessage = "";
+let storageWarningShown = false;
 
 function localDate(d=new Date()){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0");return `${y}-${m}-${day}`}
 function dayStart(d=new Date()){return new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime()}
@@ -157,15 +160,27 @@ function exampleFor(word){
   return {en:sentence,zh:translation};
 }
 function clozeExample(word){const example=exampleFor(word),escaped=word.en.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");return {...example,en:example.en.replace(new RegExp(`\\b${escaped}(?:s|es|ed|ing)?\\b`,"ig"),"______")}}
-function loadState(){try{return {...defaultState,...JSON.parse(localStorage.getItem(STORAGE_KEY)||"{}")}}catch{return structuredClone(defaultState)}}
-function persistLocalState(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}
+function progressStorageKey(auth=authSession){return auth?.user?.id?`${STORAGE_KEY}:user:${auth.user.id}`:STORAGE_KEY}
+function loadState(key=progressStorageKey()){try{return {...defaultState,...JSON.parse(localStorage.getItem(key)||"{}")}}catch{return structuredClone(defaultState)}}
+function loadInitialState(){
+  if(!authSession?.user)return loadState(STORAGE_KEY);
+  const key=progressStorageKey(authSession);
+  try{
+    if(localStorage.getItem(key)!==null)return loadState(key);
+    const migrated=loadState(STORAGE_KEY);localStorage.setItem(key,JSON.stringify(migrated));localStorage.setItem(STORAGE_KEY,JSON.stringify(defaultState));return migrated;
+  }catch{return loadState(key)}
+}
+function persistLocalState(){try{localStorage.setItem(progressStorageKey(),JSON.stringify(state));storageWarningShown=false;return true}catch(error){console.error("Local progress save failed",error);if(!storageWarningShown){storageWarningShown=true;showToast(authSession?"本机缓存写入失败，正在继续同步到云端":"本机存储空间不足，请登录后同步进度")}return false}}
 function saveState({replaceCloud=false}={}){state.updatedAt=Date.now();persistLocalState();if(replaceCloud)replaceCloudOnNextSync=true;scheduleCloudSync()}
 function loadAuthSession(){try{return JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY)||"null")}catch{return null}}
-function setAuthSession(next){authSession=next;if(next)localStorage.setItem(AUTH_STORAGE_KEY,JSON.stringify(next));else localStorage.removeItem(AUTH_STORAGE_KEY);renderAccountUI()}
+function setAuthSession(next){authSession=next;try{if(next)localStorage.setItem(AUTH_STORAGE_KEY,JSON.stringify(next));else localStorage.removeItem(AUTH_STORAGE_KEY)}catch(error){console.error("Auth session cache failed",error);showToast("登录状态无法写入本机缓存，本次仍可继续使用")}renderAccountUI()}
+function clearAnonymousProgress(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(defaultState))}catch{}}
+function activateAccount(next){const anonymousProgress=state;setAuthSession(next);state=mergeProgress(loadState(progressStorageKey(next)),anonymousProgress);persistLocalState();clearAnonymousProgress();renderDashboard();renderLibrary();renderProgress()}
+function deactivateAccount(){persistLocalState();setAuthSession(null);state=loadState(STORAGE_KEY);renderDashboard();renderLibrary();renderProgress()}
 function authHeaders(token=authSession?.access_token){const headers={apikey:SUPABASE_KEY,"Content-Type":"application/json"};if(token)headers.Authorization=`Bearer ${token}`;return headers}
 async function supabaseRequest(path,{method="GET",body,token,headers={}}={}){const response=await fetch(`${SUPABASE_URL}${path}`,{method,headers:{...authHeaders(token),...headers},body:body===undefined?undefined:JSON.stringify(body)});if(!response.ok){let detail={};try{detail=await response.json()}catch{}throw new Error(detail.msg||detail.message||detail.error_description||detail.error||`请求失败（${response.status}）`)}if(response.status===204)return null;const text=await response.text();return text?JSON.parse(text):null}
 function normalizeSession(data){if(!data?.access_token)return null;return {...data,expires_at:data.expires_at||Math.floor(Date.now()/1000)+(data.expires_in||3600)}}
-async function ensureSession(){if(!authSession)return null;if((authSession.expires_at||0)>Math.floor(Date.now()/1000)+60)return authSession;try{const data=await supabaseRequest("/auth/v1/token?grant_type=refresh_token",{method:"POST",body:{refresh_token:authSession.refresh_token},token:null});setAuthSession(normalizeSession(data));return authSession}catch{setAuthSession(null);syncStatus="登录已过期，请重新登录";return null}}
+async function ensureSession(){if(!authSession)return null;if((authSession.expires_at||0)>Math.floor(Date.now()/1000)+60)return authSession;try{const data=await supabaseRequest("/auth/v1/token?grant_type=refresh_token",{method:"POST",body:{refresh_token:authSession.refresh_token},token:null});setAuthSession(normalizeSession(data));return authSession}catch{deactivateAccount();syncStatus="登录已过期，请重新登录";return null}}
 function wordRecordScore(record={}){return +(record.modifiedAt||0)||Date.parse(record.lastSeen||"")||+(record.seen||0)}
 function mergeProgress(local,cloud){
   const a={...defaultState,...(local||{}),words:{...(local?.words||{})},activity:{...(local?.activity||{})}},b={...defaultState,...(cloud||{})};
@@ -252,15 +267,15 @@ async function handleAuthSubmit(event){
   try{
     if(authMode==="signup"){
       const redirect=encodeURIComponent(`${location.origin}${location.pathname}`),data=await supabaseRequest(`/auth/v1/signup?redirect_to=${redirect}`,{method:"POST",body:{email,password}}),next=normalizeSession(data);
-      if(next){setAuthSession(next);syncStatus="正在合并本机与云端进度…";await syncProgress(true);document.querySelector("#auth-modal").classList.remove("active")}
+      if(next){activateAccount(next);syncStatus="正在合并本机与云端进度…";await syncProgress(true);setModalOpen("#auth-modal",false)}
       else{authMode="login";authMessage="注册成功！请打开邮箱中的验证邮件，验证后再回来登录。";renderAuthModal()}
     }else{
-      const data=await supabaseRequest("/auth/v1/token?grant_type=password",{method:"POST",body:{email,password},token:null});setAuthSession(normalizeSession(data));syncStatus="正在合并本机与云端进度…";await syncProgress(true);document.querySelector("#auth-modal").classList.remove("active")
+      const data=await supabaseRequest("/auth/v1/token?grant_type=password",{method:"POST",body:{email,password},token:null});activateAccount(normalizeSession(data));syncStatus="正在合并本机与云端进度…";await syncProgress(true);setModalOpen("#auth-modal",false)
     }
   }catch(error){authMessage=authErrorText(error.message);renderAuthModal()}
 }
 async function logoutAccount(){
-  const current=authSession;try{await syncProgress();if(current)await supabaseRequest("/auth/v1/logout",{method:"POST",token:current.access_token})}catch{}setAuthSession(null);syncStatus="未登录 · 进度仅保存在当前设备";authMessage="";renderAuthModal();showToast("已退出登录，本机进度仍会保留")
+  const current=authSession;try{await syncProgress();if(current)await supabaseRequest("/auth/v1/logout",{method:"POST",token:current.access_token})}catch{}deactivateAccount();syncStatus="未登录 · 进度仅保存在当前设备";authMessage="";renderAuthModal();showToast("已退出登录，账号进度已保存在独立缓存中")
 }
 async function initAuth(){
   renderAccountUI();if(!authSession)return;syncStatus="正在连接云端…";renderAccountUI();const valid=await ensureSession();if(valid)await syncProgress();else renderAccountUI()
@@ -338,22 +353,24 @@ function finishWord(){
 function renderComplete(){document.querySelector("#session-progress-bar").style.width="100%";document.querySelector("#session-step").textContent="完成";document.querySelector("#study-card").innerHTML=`<div class="completion-icon">✓</div><span class="question-type">TODAY COMPLETE</span><h2 class="question-main chinese">今天的训练完成了！</h2><p class="question-note">记忆不靠一次记住，而靠每次及时回来。</p><div class="completion-stats"><div><strong>${session.queue.length}</strong><span>完成词数</span></div><div><strong>${session.correct}</strong><span>正确拼写</span></div><div><strong>${session.errors}</strong><span>纠正次数</span></div></div><button class="primary-button" id="finish-session">返回首页</button>`;document.querySelector("#finish-session").onclick=closeSession}
 function closeSession(){document.querySelector("#session-overlay").classList.remove("active");document.querySelector("#session-overlay").setAttribute("aria-hidden","true");session=null;renderDashboard();renderProgress()}
 function escapeAttr(s){return String(s).replaceAll("&","&amp;").replaceAll('"',"&quot;").replaceAll("'","&#39;").replaceAll("<","&lt;").replaceAll(">","&gt;")}
+function setModalOpen(selector,open){const modal=document.querySelector(selector);modal.classList.toggle("active",open);modal.setAttribute("aria-hidden",String(!open));if(open)setTimeout(()=>modal.querySelector("input,button")?.focus(),0)}
 
 document.querySelectorAll(".nav-item[data-view]").forEach(b=>b.addEventListener("click",()=>switchView(b.dataset.view)));
-document.querySelectorAll('[data-action="open-settings"]').forEach(b=>b.addEventListener("click",()=>{document.querySelector("#daily-range").value=state.dailyGoal;updateRange();document.querySelector("#settings-modal").classList.add("active")}));
-document.querySelectorAll('[data-action="close-settings"]').forEach(b=>b.addEventListener("click",()=>document.querySelector("#settings-modal").classList.remove("active")));
-document.querySelectorAll('[data-action="open-auth"]').forEach(b=>b.addEventListener("click",()=>{authMessage="";renderAuthModal();document.querySelector("#auth-modal").classList.add("active")}));
-document.querySelectorAll('[data-action="close-auth"]').forEach(b=>b.addEventListener("click",()=>document.querySelector("#auth-modal").classList.remove("active")));
+document.querySelectorAll('[data-action="open-settings"]').forEach(b=>b.addEventListener("click",()=>{document.querySelector("#daily-range").value=state.dailyGoal;updateRange();setModalOpen("#settings-modal",true)}));
+document.querySelectorAll('[data-action="close-settings"]').forEach(b=>b.addEventListener("click",()=>setModalOpen("#settings-modal",false)));
+document.querySelectorAll('[data-action="open-auth"]').forEach(b=>b.addEventListener("click",()=>{authMessage="";renderAuthModal();setModalOpen("#auth-modal",true)}));
+document.querySelectorAll('[data-action="close-auth"]').forEach(b=>b.addEventListener("click",()=>setModalOpen("#auth-modal",false)));
 document.querySelector("#daily-range").addEventListener("input",updateRange);function updateRange(){const n=+document.querySelector("#daily-range").value;document.querySelector("#daily-value").textContent=n;document.querySelector("#estimated-time").textContent=Math.ceil(n*.75)}
-document.querySelector("#save-settings").onclick=()=>{state.dailyGoal=+document.querySelector("#daily-range").value;saveState();document.querySelector("#settings-modal").classList.remove("active");renderDashboard();showToast("学习计划已更新")};
-document.querySelector("#reset-progress").onclick=()=>{if(confirm("确定要清除全部学习记录吗？此操作无法撤销。")){state=structuredClone(defaultState);saveState({replaceCloud:true});document.querySelector("#settings-modal").classList.remove("active");renderDashboard();showToast("学习记录已重置")}};
+document.querySelector("#save-settings").onclick=()=>{state.dailyGoal=+document.querySelector("#daily-range").value;saveState();setModalOpen("#settings-modal",false);renderDashboard();showToast("学习计划已更新")};
+document.querySelector("#reset-progress").onclick=()=>{if(confirm("确定要清除全部学习记录吗？此操作无法撤销。")){state=structuredClone(defaultState);saveState({replaceCloud:true});setModalOpen("#settings-modal",false);renderDashboard();showToast("学习记录已重置")}};
 document.querySelector("#start-session").onclick=openSession;document.querySelector("#close-session").onclick=()=>{if(confirm("要先退出吗？已经完成的单词会保留进度。"))closeSession()};
 document.querySelector("#word-search").addEventListener("input",()=>{libraryLimit=100;renderLibrary()});document.querySelector("#category-filters").addEventListener("click",e=>{if(e.target.dataset.category){activeCategory=e.target.dataset.category;libraryLimit=100;renderLibrary()}});
 document.querySelector("#word-list").addEventListener("click",e=>{if(e.target.id==="load-more"){libraryLimit+=100;renderLibrary()}});
 document.addEventListener("click",e=>{const button=e.target.closest("[data-speak]");if(button){e.preventDefault();e.stopPropagation();speakWord(button.dataset.speak)}});
 document.addEventListener("keydown",e=>{if(e.key!=="Enter"||e.repeat||!session||!document.querySelector("#session-overlay").classList.contains("active"))return;const next=document.querySelector("#next-word")||document.querySelector("#to-spelling")||document.querySelector("#finish-session");if(next){e.preventDefault();next.click()}});
-document.querySelector("#settings-modal").addEventListener("click",e=>{if(e.target.id==="settings-modal")e.currentTarget.classList.remove("active")});
-document.querySelector("#auth-modal").addEventListener("click",e=>{if(e.target.id==="auth-modal")e.currentTarget.classList.remove("active")});
+document.addEventListener("keydown",e=>{if(e.key!=="Escape")return;if(document.querySelector("#auth-modal").classList.contains("active"))setModalOpen("#auth-modal",false);else if(document.querySelector("#settings-modal").classList.contains("active"))setModalOpen("#settings-modal",false)});
+document.querySelector("#settings-modal").addEventListener("click",e=>{if(e.target.id==="settings-modal")setModalOpen("#settings-modal",false)});
+document.querySelector("#auth-modal").addEventListener("click",e=>{if(e.target.id==="auth-modal")setModalOpen("#auth-modal",false)});
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){refreshEnglishVoices();if(authSession)syncProgress();checkForAppUpdate()}else if("speechSynthesis" in window){window.speechSynthesis.cancel();finishSpeech(speechRequestId)}});
 window.addEventListener("online",()=>{if(authSession)syncProgress()});
 
