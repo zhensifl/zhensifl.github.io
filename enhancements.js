@@ -17,7 +17,7 @@ function migrateLegacyMemoryState(source={}){
     if(record.stage>=0&&!Number.isFinite(record.stability)){
       const stage=Math.max(0,Math.min(STAGE_DAYS.length-1,Number(record.stage)||0));
       const lastReviewAt=Number(record.lastReviewAt)||Number(record.modifiedAt)||Date.parse(record.lastSeen||record.learnedOn||"")||0;
-      const scheduledDays=lastReviewAt&&Number(record.due)>lastReviewAt?Math.round((Number(record.due)-dayStart(lastReviewAt))/DAY):0;
+      const scheduledDays=lastReviewAt&&Number(record.due)>lastReviewAt?Math.round((Number(record.due)-dayStart(new Date(lastReviewAt)))/DAY):0;
       const stageStability=STAGE_DAYS[stage]||1;
       record.stability=+(scheduledDays>0?Math.max(.4,Math.min(stageStability,scheduledDays)):stageStability).toFixed(2);
       const attempts=Math.max(1,Number(record.seen)||1),mistakes=(Number(record.errors)||0)+(Number(record.unknowns)||0)*2;
@@ -251,4 +251,4 @@ syncProgress=async(notify=false)=>{
 
 document.addEventListener("keydown",event=>{if(event.key==="Escape"&&document.querySelector("#placement-modal").classList.contains("active"))setModalOpen("#placement-modal",false)});
 populateEnhancedSettings();renderDashboard();renderLibrary();renderProgress();consumeRecoveryLink();setTimeout(()=>{if(!state.placementDone&&!Object.keys(state.words).length)openPlacement(true)},700);
-window.WordStepEnhancements={version:"20260829-4",retrievability,nextSchedule,openPlacement,exportProgress,migrateLegacyMemoryState};
+window.WordStepEnhancements={version:"20260829-5",retrievability,nextSchedule,openPlacement,exportProgress,migrateLegacyMemoryState};
