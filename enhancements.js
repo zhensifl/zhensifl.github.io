@@ -8,6 +8,35 @@ const ENHANCED_DEFAULTS = {level:"A2",track:"all",trainingMode:"mixed",reviewLim
 Object.assign(defaultState,ENHANCED_DEFAULTS);
 Object.entries(ENHANCED_DEFAULTS).forEach(([key,value])=>{if(state[key]===undefined)state[key]=value});
 
+const MEMORY_MODEL_VERSION = 2;
+function migrateLegacyMemoryState(source={}){
+  const migrated={...defaultState,...source,words:{},activity:{...(source.activity||{})},memoryModelVersion:MEMORY_MODEL_VERSION};
+  let changed=source.memoryModelVersion!==MEMORY_MODEL_VERSION;
+  Object.entries(source.words||{}).forEach(([id,value])=>{
+    const record={...(value||{})};
+    if(record.stage>=0&&!Number.isFinite(record.stability)){
+      const stage=Math.max(0,Math.min(STAGE_DAYS.length-1,Number(record.stage)||0));
+      const lastReviewAt=Number(record.lastReviewAt)||Number(record.modifiedAt)||Date.parse(record.lastSeen||record.learnedOn||"")||0;
+      const scheduledDays=lastReviewAt&&Number(record.due)>lastReviewAt?Math.round((Number(record.due)-dayStart(lastReviewAt))/DAY):0;
+      const stageStability=STAGE_DAYS[stage]||1;
+      record.stability=+(scheduledDays>0?Math.max(.4,Math.min(stageStability,scheduledDays)):stageStability).toFixed(2);
+      const attempts=Math.max(1,Number(record.seen)||1),mistakes=(Number(record.errors)||0)+(Number(record.unknowns)||0)*2;
+      record.difficulty=+Math.max(1,Math.min(10,5+mistakes/attempts*2.5)).toFixed(2);
+      record.lapses=Number(record.lapses)||Number(record.unknowns)||0;
+      record.lastReviewAt=lastReviewAt;
+      record.lastRating=record.lastRating||null;
+      changed=true;
+    }
+    migrated.words[id]=record;
+  });
+  return {state:migrated,changed};
+}
+{
+  const migration=migrateLegacyMemoryState(state);
+  state=migration.state;
+  if(migration.changed){state.updatedAt=Date.now();persistLocalState()}
+}
+
 const categoryTotals=WORDS.reduce((totals,word)=>({...totals,[word.category]:(totals[word.category]||0)+1}),{}),categoryPositions={};
 WORDS.forEach((word,rank)=>{
   word.rank=rank;const position=categoryPositions[word.category]||0,ratio=position/categoryTotals[word.category];categoryPositions[word.category]=position+1;
@@ -22,9 +51,9 @@ function enhancedRecord(id){
 ws=id=>enhancedRecord(id);
 
 mergeProgress=(local,cloud)=>{
-  const a={...defaultState,...(local||{}),words:{...(local?.words||{})},activity:{...(local?.activity||{})}},b={...defaultState,...(cloud||{}),words:{...(cloud?.words||{})},activity:{...(cloud?.activity||{})}};
+  const a=migrateLegacyMemoryState(local||{}).state,b=migrateLegacyMemoryState(cloud||{}).state;
   const newer=(b.updatedAt||0)>(a.updatedAt||0)?b:a;
-  const merged={...defaultState,words:{},activity:{},lastStudyDate:[a.lastStudyDate,b.lastStudyDate].filter(Boolean).sort().pop()||null,updatedAt:Math.max(a.updatedAt||0,b.updatedAt||0)};
+  const merged={...defaultState,words:{},activity:{},memoryModelVersion:MEMORY_MODEL_VERSION,lastStudyDate:[a.lastStudyDate,b.lastStudyDate].filter(Boolean).sort().pop()||null,updatedAt:Math.max(a.updatedAt||0,b.updatedAt||0)};
   WORDSTEP_SETTINGS.forEach(key=>{merged[key]=newer[key]??defaultState[key]});
   new Set([...Object.keys(a.words),...Object.keys(b.words)]).forEach(id=>{const left=a.words[id],right=b.words[id];merged.words[id]=!left?right:!right?left:wordRecordScore(right)>wordRecordScore(left)?right:left});
   new Set([...Object.keys(a.activity),...Object.keys(b.activity)]).forEach(day=>{
@@ -180,8 +209,8 @@ renderLibrary=()=>{
 
 function recentActivity(days=7){const rows=[];for(let index=0;index<days;index++){const date=new Date(dayStart()-index*DAY);rows.push(state.activity[localDate(date)]||{})}return rows}
 renderProgress=()=>{
-  const learned=WORDS.filter(word=>ws(word.id).stage>=0),mastered=learned.filter(word=>ws(word.id).stability>=30),practiced=Object.values(state.activity).reduce((sum,item)=>sum+(item.completed||0),0),known=learned.filter(word=>ws(word.id).stability>=7&&retrievability(ws(word.id))>=.8).length,tomorrow=dayStart()+DAY,dueTomorrow=learned.filter(word=>ws(word.id).due>dayStart()&&ws(word.id).due<=tomorrow).length,recent=recentActivity(),attempts=recent.reduce((sum,item)=>sum+(item.attempts||item.completed||0),0),correct=recent.reduce((sum,item)=>sum+(item.correct||0),0),accuracy=attempts?Math.round(correct/attempts*100):100;
-  document.querySelector("#progress-stats").innerHTML=[[learned.length,"已学习词汇",`${state.level} 当前等级`],[mastered.length,"长期掌握","稳定度 ≥ 30 天"],[streak(),"连续学习","天"],[practiced,"累计练习","次"]].map(item=>`<article class="big-stat"><span>${item[1]}</span><strong>${item[0]}</strong><small>${item[2]}</small></article>`).join("");document.querySelector("#insight-grid").innerHTML=`<article class="insight-card"><span>预计可用词汇量</span><strong>${known}</strong><small>当前记忆概率 ≥ 80%</small></article><article class="insight-card"><span>近 7 天正确率</span><strong>${accuracy}%</strong><small>${attempts} 次有效练习</small></article><article class="insight-card"><span>明日预计复习</span><strong>${dueTomorrow}</strong><small>会根据今天表现动态变化</small></article>`;
+  const learned=WORDS.filter(word=>ws(word.id).stage>=0),mastered=learned.filter(word=>ws(word.id).stability>=30),practiced=Object.values(state.activity).reduce((sum,item)=>sum+(item.completed||0),0),known=learned.filter(word=>ws(word.id).stability>=7&&retrievability(ws(word.id))>=.8).length,tomorrow=dayStart()+DAY,dueTomorrow=learned.filter(word=>ws(word.id).due>dayStart()&&ws(word.id).due<=tomorrow).length,recent=recentActivity(),measured=recent.filter(item=>Number(item.attempts)>0&&Number.isFinite(Number(item.correct))),attempts=measured.reduce((sum,item)=>sum+Number(item.attempts),0),correct=measured.reduce((sum,item)=>sum+Math.min(Number(item.attempts),Math.max(0,Number(item.correct))),0),accuracy=attempts?Math.round(correct/attempts*100):null;
+  document.querySelector("#progress-stats").innerHTML=[[learned.length,"已学习词汇",`${state.level} 当前等级`],[mastered.length,"长期掌握","稳定度 ≥ 30 天"],[streak(),"连续学习","天"],[practiced,"累计练习","次"]].map(item=>`<article class="big-stat"><span>${item[1]}</span><strong>${item[0]}</strong><small>${item[2]}</small></article>`).join("");document.querySelector("#insight-grid").innerHTML=`<article class="insight-card"><span>预计可用词汇量</span><strong>${known}</strong><small>当前记忆概率 ≥ 80%</small></article><article class="insight-card"><span>近 7 天正确率</span><strong>${accuracy===null?"—":`${accuracy}%`}</strong><small>${accuracy===null?"旧记录未保存正确次数，将从新版练习开始统计":`${attempts} 次有效练习`}</small></article><article class="insight-card"><span>明日预计复习</span><strong>${dueTomorrow}</strong><small>会根据今天表现动态变化</small></article>`;
   const stages=[{name:"初次接触",min:0,max:1.49},{name:"正在记住",min:1.5,max:6.99},{name:"逐渐稳定",min:7,max:29.99},{name:"长期掌握",min:30,max:Infinity}],counts=stages.map(stage=>learned.filter(word=>{const value=ws(word.id).stability||0;return value>=stage.min&&value<=stage.max}).length),max=Math.max(1,...counts);document.querySelector("#stage-list").innerHTML=stages.map((stage,index)=>`<div class="stage-row"><span>${stage.name}</span><div class="stage-track"><div class="stage-fill" style="width:${counts[index]/max*100}%;opacity:${.6+index*.12}"></div></div><strong>${counts[index]}</strong></div>`).join("");
   const scenes=categoryNames.map(category=>{const words=WORDS.filter(word=>word.category===category),done=words.filter(word=>ws(word.id).stage>=0).length;return {category,percent:Math.round(done/words.length*100)}}).sort((a,b)=>b.percent-a.percent);document.querySelector("#scene-mastery").innerHTML=scenes.map(scene=>`<div class="scene-row"><span>${scene.category}</span><div class="scene-track"><span style="width:${scene.percent}%"></span></div><strong>${scene.percent}%</strong></div>`).join("");const weak=weakWords().slice(0,8);document.querySelector("#weak-word-list").innerHTML=weak.length?weak.map(word=>`<div class="weak-word"><strong>${escapeAttr(word.en)}</strong><span>${RATING_LABELS[ws(word.id).lastRating]||"需要巩固"} · ${Math.round(retrievability(ws(word.id))*100)}%</span></div>`).join(""):`<div class="empty-state">暂时没有易错词</div>`;
 };
@@ -194,7 +223,7 @@ document.querySelector("#retake-placement").onclick=()=>openPlacement(true);docu
 document.querySelector("#library-level-filter").addEventListener("change",event=>{activeLevelFilter=event.target.value;libraryLimit=100;renderLibrary()});
 
 function exportProgress(){const payload={app:"WordStep",formatVersion:2,exportedAt:new Date().toISOString(),state};const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),anchor=document.createElement("a");anchor.href=url;anchor.download=`wordstep-backup-${localDate()}.json`;anchor.click();setTimeout(()=>URL.revokeObjectURL(url),500);showToast("学习记录已导出")}
-async function importProgressFile(file){try{const payload=JSON.parse(await file.text()),incoming=payload.state||payload;if(!incoming||typeof incoming!=="object"||typeof incoming.words!=="object"||typeof incoming.activity!=="object")throw new Error("文件格式不正确");if(!confirm("导入会用备份中的设置和学习记录替换当前设备数据，是否继续？"))return;state={...defaultState,...incoming,words:{...incoming.words},activity:{...incoming.activity},updatedAt:Date.now()};saveState({replaceCloud:true});populateEnhancedSettings();renderDashboard();renderLibrary();renderProgress();setModalOpen("#settings-modal",false);showToast("学习记录已恢复并准备同步")}catch(error){showToast(`导入失败：${error.message}`)}}
+async function importProgressFile(file){try{const payload=JSON.parse(await file.text()),incoming=payload.state||payload;if(!incoming||typeof incoming!=="object"||typeof incoming.words!=="object"||typeof incoming.activity!=="object")throw new Error("文件格式不正确");if(!confirm("导入会用备份中的设置和学习记录替换当前设备数据，是否继续？"))return;state=migrateLegacyMemoryState({...defaultState,...incoming,words:{...incoming.words},activity:{...incoming.activity},updatedAt:Date.now()}).state;saveState({replaceCloud:true});populateEnhancedSettings();renderDashboard();renderLibrary();renderProgress();setModalOpen("#settings-modal",false);showToast("学习记录已恢复并准备同步")}catch(error){showToast(`导入失败：${error.message}`)}}
 document.querySelector("#export-progress").onclick=exportProgress;document.querySelector("#import-progress").onclick=()=>document.querySelector("#import-file").click();document.querySelector("#import-file").onchange=event=>{const file=event.target.files?.[0];if(file)importProgressFile(file);event.target.value=""};
 
 let deferredInstallPrompt=null;
@@ -222,4 +251,4 @@ syncProgress=async(notify=false)=>{
 
 document.addEventListener("keydown",event=>{if(event.key==="Escape"&&document.querySelector("#placement-modal").classList.contains("active"))setModalOpen("#placement-modal",false)});
 populateEnhancedSettings();renderDashboard();renderLibrary();renderProgress();consumeRecoveryLink();setTimeout(()=>{if(!state.placementDone&&!Object.keys(state.words).length)openPlacement(true)},700);
-window.WordStepEnhancements={version:"20260829-3",retrievability,nextSchedule,openPlacement,exportProgress};
+window.WordStepEnhancements={version:"20260829-4",retrievability,nextSchedule,openPlacement,exportProgress,migrateLegacyMemoryState};
