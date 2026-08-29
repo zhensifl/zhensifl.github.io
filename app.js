@@ -100,15 +100,15 @@ const TOO_BASIC_WORDS = new Set(`
   go come get give take make say tell see look know think want like love eat drink sleep sit stand walk run read write
 `.trim().split(/\s+/));
 const EXCLUDED_WORDS = new Set("murder suicide".split(" "));
-const GENERATED_BASIC_SKIP = 400;
 const DICTIONARY_BY_EN = new Map((window.WORD_DATA||[]).map(word=>[word.en.toLowerCase(),word]));
 const ALL_WORDS = [...CURATED_WORDS,...(window.WORD_DATA||[])].map((word,index)=>({...word,pos:partOfSpeech(word),id:index+1,isCurated:index<CURATED_WORDS.length}));
 function isUsefulVocabulary(word){return !EXCLUDED_WORDS.has(word.en.toLowerCase())&&!/(?:男子名|女子名|人名|城市名|州名|国家名)/.test(word.zh)}
-const WORDS = ALL_WORDS.filter(word=>word.isCurated||(word.id>CURATED_WORDS.length+GENERATED_BASIC_SKIP&&!TOO_BASIC_WORDS.has(word.en.toLowerCase())&&isUsefulVocabulary(word))).slice(0,5000);
+const vocabularySeen=new Set();
+const WORDS = ALL_WORDS.filter(word=>{const key=word.en.toLowerCase();if(vocabularySeen.has(key))return false;if(!word.isCurated&&(TOO_BASIC_WORDS.has(key)||!isUsefulVocabulary(word)))return false;vocabularySeen.add(key);return true});
 
 const STORAGE_KEY = "wordstep-state-v1";
 const AUTH_STORAGE_KEY = "wordstep-auth-v1";
-const APP_VERSION = "20260829-2";
+const APP_VERSION = "20260829-3";
 const SUPABASE_URL = "https://wgvxdzwrvgktcidmofit.supabase.co";
 const SUPABASE_KEY = "sb_publishable_O2PaZM-nTJKAaeUYKiXbBw_r4WmllMx";
 const DAY = 86400000;

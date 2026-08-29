@@ -1,0 +1,14 @@
+{
+  "name": "WordStep 英语词汇训练",
+  "short_name": "WordStep",
+  "description": "日常生活与职场英语词汇、听力、拼写和智能复习",
+  "lang": "zh-CN",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f5ff",
+  "theme_color": "#5b3aa9",
+  "icons": [
+    {"src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}
+  ]
+}
