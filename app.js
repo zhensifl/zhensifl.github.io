@@ -108,7 +108,7 @@ const WORDS = ALL_WORDS.filter(word=>word.isCurated||(word.id>CURATED_WORDS.leng
 
 const STORAGE_KEY = "wordstep-state-v1";
 const AUTH_STORAGE_KEY = "wordstep-auth-v1";
-const APP_VERSION = "20260829-1";
+const APP_VERSION = "20260829-2";
 const SUPABASE_URL = "https://wgvxdzwrvgktcidmofit.supabase.co";
 const SUPABASE_KEY = "sb_publishable_O2PaZM-nTJKAaeUYKiXbBw_r4WmllMx";
 const DAY = 86400000;
@@ -207,8 +207,22 @@ function todayQueue(){return [...dueWords(),...unseenWords().slice(0,newAllowanc
 function streak(){const days=Object.keys(state.activity).filter(k=>state.activity[k]?.completed>0).sort().reverse();if(!days.length)return 0;let cursor=dayStart(),count=0;const today=localDate();if(days[0]!==today)cursor-=DAY;while(days.includes(localDate(new Date(cursor)))){count++;cursor-=DAY}return count}
 function showToast(text){const el=document.querySelector("#toast");el.textContent=text;el.classList.add("show");setTimeout(()=>el.classList.remove("show"),2200)}
 let activeUtterance=null,activeSpeechText="",speechRequestId=0,speechStartTimer=null,lastSpeechClick=0,englishVoices=[];
-function refreshEnglishVoices(){if(!("speechSynthesis" in window))return [];englishVoices=window.speechSynthesis.getVoices().filter(voice=>voice.lang?.toLowerCase().startsWith("en"));return englishVoices}
-function preferredEnglishVoice(){const voices=refreshEnglishVoices();return voices.find(voice=>voice.localService&&voice.lang.toLowerCase()==="en-us")||voices.find(voice=>voice.localService)||voices.find(voice=>voice.lang.toLowerCase()==="en-us")||voices[0]||null}
+function availableVoices(){return "speechSynthesis" in window?window.speechSynthesis.getVoices():[]}
+function refreshEnglishVoices(){englishVoices=availableVoices().filter(voice=>voice.lang?.toLowerCase().startsWith("en"));return englishVoices}
+function speechVoicePlan(){
+  const voices=availableVoices(),english=voices.filter(voice=>voice.lang?.toLowerCase().startsWith("en")),localEnglish=english.filter(voice=>voice.localService),localVoices=voices.filter(voice=>voice.localService),localChinese=localVoices.filter(voice=>voice.lang?.toLowerCase().startsWith("zh"));
+  return [...new Set([
+    localEnglish.find(voice=>voice.lang.toLowerCase()==="en-us"),
+    localEnglish.find(voice=>voice.default),
+    localEnglish[0],
+    localVoices.find(voice=>voice.default),
+    ...localChinese,
+    ...localVoices,
+    english.find(voice=>voice.lang.toLowerCase()==="en-us"),
+    english[0]
+  ].filter(Boolean))];
+}
+function preferredEnglishVoice(attempt=0){const plan=speechVoicePlan();return plan[Math.min(attempt,Math.max(0,plan.length-1))]||null}
 function updateSpeechButtons(text,status="idle"){
   document.querySelectorAll("[data-speak]").forEach(button=>{if(button.dataset.speak!==text)return;button.classList.toggle("speaking",status==="speaking");button.classList.toggle("speech-pending",status==="pending");button.classList.toggle("speech-error",status==="error");button.setAttribute("aria-busy",String(status==="pending"||status==="speaking"));button.textContent=status==="pending"?"…":status==="speaking"?"🔉":"🔊";button.title=status==="pending"?"正在准备发音":status==="speaking"?"正在播放":status==="error"?"播放失败，点击重试":"点击发音"});
 }
@@ -216,16 +230,16 @@ function finishSpeech(requestId,status="idle"){if(requestId!==speechRequestId)re
 function speakWord(text){
   if(!("speechSynthesis" in window)||!("SpeechSynthesisUtterance" in window)){showToast("当前浏览器不支持语音播放，请换用 Safari、Chrome 或 Edge");return}
   const synth=window.speechSynthesis,now=Date.now();
-  if(activeSpeechText===text&&(synth.speaking||synth.pending)&&now-lastSpeechClick<1400){lastSpeechClick=now;if(synth.paused)synth.resume();updateSpeechButtons(text,"speaking");return}
+  if(activeSpeechText===text&&synth.speaking&&now-lastSpeechClick<900){lastSpeechClick=now;if(synth.paused)synth.resume();updateSpeechButtons(text,"speaking");return}
   lastSpeechClick=now;const requestId=++speechRequestId;clearTimeout(speechStartTimer);if(activeSpeechText)updateSpeechButtons(activeSpeechText,"idle");activeSpeechText=text;updateSpeechButtons(text,"pending");synth.cancel();
   const begin=attempt=>{
     if(requestId!==speechRequestId)return;
-    let started=false;const utterance=new SpeechSynthesisUtterance(text);activeUtterance=utterance;utterance.lang="en-US";utterance.rate=attempt?0.82:0.78;utterance.pitch=1;utterance.volume=1;utterance.voice=preferredEnglishVoice();
+    let started=false;const utterance=new SpeechSynthesisUtterance(text),voice=preferredEnglishVoice(attempt);activeUtterance=utterance;utterance.lang="en-US";utterance.rate=.82;utterance.pitch=1;utterance.volume=1;if(voice)utterance.voice=voice;
     utterance.onstart=()=>{if(requestId!==speechRequestId)return;started=true;clearTimeout(speechStartTimer);updateSpeechButtons(text,"speaking")};
     utterance.onend=()=>finishSpeech(requestId);
-    utterance.onerror=event=>{if(requestId!==speechRequestId||["canceled","interrupted"].includes(event.error))return;if(!attempt){clearTimeout(speechStartTimer);setTimeout(()=>begin(1),120)}else{finishSpeech(requestId,"error");showToast("发音没有播放，请检查媒体音量后再点一次")}};
-    try{if(synth.paused)synth.resume();synth.speak(utterance)}catch{if(!attempt)setTimeout(()=>begin(1),120);else{finishSpeech(requestId,"error");showToast("发音启动失败，请刷新页面后重试")}}
-    speechStartTimer=setTimeout(()=>{if(requestId!==speechRequestId||started)return;synth.cancel();if(!attempt)setTimeout(()=>begin(1),120);else{finishSpeech(requestId,"error");showToast("语音引擎暂未响应，请检查媒体音量后重试")}},1800);
+    utterance.onerror=event=>{if(requestId!==speechRequestId||["canceled","interrupted"].includes(event.error))return;clearTimeout(speechStartTimer);if(!attempt){synth.cancel();setTimeout(()=>begin(1),180)}else{finishSpeech(requestId,"error");showToast("发音没有播放，请检查设备媒体音量后重试")}};
+    try{if(synth.paused)synth.resume();synth.speak(utterance)}catch{if(!attempt)setTimeout(()=>begin(1),180);else{finishSpeech(requestId,"error");showToast("发音启动失败，请刷新页面后重试")}return}
+    speechStartTimer=setTimeout(()=>{if(requestId!==speechRequestId||started)return;if(synth.speaking){started=true;updateSpeechButtons(text,"speaking");return}synth.cancel();if(!attempt)setTimeout(()=>begin(1),220);else{finishSpeech(requestId,"error");showToast("系统语音暂时不可用，请刷新页面后重试")}},7500);
   };
   begin(0);
 }
