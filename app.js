@@ -111,21 +111,40 @@ const TOO_BASIC_WORDS = new Set(`
   word clear outside self board cost cut field main moment road per oh non
   town hear rest wife beautiful date land miss strong hour sorry answer learn alone bank movie park cool sound usually save
   stuff drive fall fast picture size step hey key page cup football hate
+  river tree mountain lake ocean beach sea forest garden flower grass sky sun moon star earth rain snow wind weather island
+  animal bird fish horse cow pig sheep chicken duck rabbit mouse monkey lion tiger bear
+  eye ear nose mouth tooth teeth neck arm leg foot feet finger shirt shoe hat coat dress pants sock apple banana orange egg
+  spring summer autumn fall winter doctor hospital teacher student
+  zero eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty thirty forty fifty sixty seventy
+  eighty ninety hundred thousand million billion aircraft truck bowl meat cream salt smile giant tiny wave bright wing bell
+  boyfriend cry dollar empty mile flag guest kiss load scared stream
+  taylor tony bob don nick pacific kinda split escape fault fill friendly pure secure strange talent temperature blame false
+  obvious slowly vision usual upset hang row blow careful danger branch favor frame sentence bottle bunch chat cheese detail
+  diet favourite fruit item lane mess parent pleasure shift tank tight
+  yard anybody basketball button golf tool turkey amazon circle dirty joy noise plate rice roof tip baseball bathroom cable
+  calm hide sight sing wet bike cake loud motor peak sample battery blind breath chest paint pilot pink singer steam tall cap
+  fee lock plastic tie bread lift shoulder shower tower wheel bush chocolate coal colour gallery highway inch smell speaker tone
+  topic grey gray guitar meal pocket soccer bone clothing gap gate gotten lesson mirror thin adventure awful bedroom cloud gear
+  hip package railway wash acid castle flash fort math mystery palace pet silent trail uncle bath chase horrible matt hong sydney
+  dan jordan ford miller zealand eric kong santa toronto lewis mac
+  jimmy dallas walker dean sand shadow tape clock desk gym pizza belt diamond ghost hockey lab soil stomach trash cousin dust
+  illness knife telephone butter crystal desert mum boring helpful anger nervous ordinary ugly rarely
   morning breakfast kitchen clean quiet hungry cheap price cash hobby weekend together interesting remember
   mr mrs ms god john james david michael robert mary york london america american british england english china chinese japan
   january february march april june july august september october november december monday tuesday wednesday thursday friday saturday sunday
   north south east west x l tv re gonna wanna yeah okay ok
 `.trim().split(/\s+/));
-const EXCLUDED_WORDS = new Set("murder suicide kill killed killing killer gun shot shooting attack war death dead blood sex sexual porn church king queen god hell lord damn french european united".split(" "));
+const EXCLUDED_WORDS = new Set("murder suicide kill killed killing killer gun shot shooting attack bomb combat arrest victim weapon gang assault rape war death dead blood violent violence soldier sex sexy sexual porn naked racist suck crap bullshit church catholic bible temple prayer angel king queen god hell heaven lord damn french european united".split(" "));
+const MIN_GENERATED_RANK = 2200;
 const DICTIONARY_BY_EN = new Map((window.WORD_DATA||[]).map(word=>[word.en.toLowerCase(),word]));
 const ALL_WORDS = [...CURATED_WORDS,...(window.WORD_DATA||[])].map((word,index)=>({...word,pos:partOfSpeech(word),id:index+1,isCurated:index<CURATED_WORDS.length}));
-function isUsefulVocabulary(word){return word.en.length>=3&&!word.base&&!EXCLUDED_WORDS.has(word.en.toLowerCase())&&!/(?:男子名|女子名|人名|城市名|州名|国家名|国名|首都)/.test(word.zh)}
+function isUsefulVocabulary(word){return word.en.length>=3&&Number(word.frequencyRank||Infinity)>=MIN_GENERATED_RANK&&!word.base&&!word.proper&&!EXCLUDED_WORDS.has(word.en.toLowerCase())&&!/(?:男子名|女子名|人名|城市名|州名|国家名|国名|首都)/.test(word.zh)}
 const vocabularySeen=new Set();
 const WORDS = ALL_WORDS.filter(word=>{const key=word.en.toLowerCase();if(vocabularySeen.has(key))return false;if(TOO_BASIC_WORDS.has(key)||(!word.isCurated&&!isUsefulVocabulary(word)))return false;vocabularySeen.add(key);return true});
 
 const STORAGE_KEY = "wordstep-state-v1";
 const AUTH_STORAGE_KEY = "wordstep-auth-v1";
-const APP_VERSION = "20260830-4";
+const APP_VERSION = "20260831-2";
 const SUPABASE_URL = "https://wgvxdzwrvgktcidmofit.supabase.co";
 const SUPABASE_KEY = "sb_publishable_O2PaZM-nTJKAaeUYKiXbBw_r4WmllMx";
 const DAY = 86400000;
