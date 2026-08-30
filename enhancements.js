@@ -77,8 +77,6 @@ function weakness(record){
 unseenWords=()=>WORDS.filter(word=>ws(word.id).stage<0&&word.level===state.level&&trackMatches(word));
 dueWords=()=>WORDS.filter(word=>{const record=ws(word.id);return record.stage>=0&&record.due<=dayStart()}).sort((left,right)=>retrievability(ws(left.id))-retrievability(ws(right.id))||weakness(ws(right.id))-weakness(ws(left.id))||ws(left.id).due-ws(right.id).due);
 weakWords=()=>WORDS.filter(word=>ws(word.id).stage>=0&&weakness(ws(word.id))>1.1).sort((left,right)=>weakness(ws(right.id))-weakness(ws(left.id)));
-const originalNewAllowance=newAllowance;
-newAllowance=()=>{const allowance=originalNewAllowance();return dueWords().length>state.reviewLimit?Math.min(5,allowance):allowance};
 todayQueue=()=>[...dueWords().slice(0,state.reviewLimit),...unseenWords().slice(0,newAllowance())];
 
 const originalExampleFor=exampleFor;
@@ -251,4 +249,4 @@ syncProgress=async(notify=false)=>{
 
 document.addEventListener("keydown",event=>{if(event.key==="Escape"&&document.querySelector("#placement-modal").classList.contains("active"))setModalOpen("#placement-modal",false)});
 populateEnhancedSettings();renderDashboard();renderLibrary();renderProgress();consumeRecoveryLink();setTimeout(()=>{if(!state.placementDone&&!Object.keys(state.words).length)openPlacement(true)},700);
-window.WordStepEnhancements={version:"20260829-5",retrievability,nextSchedule,openPlacement,exportProgress,migrateLegacyMemoryState};
+window.WordStepEnhancements={version:"20260830-1",retrievability,nextSchedule,openPlacement,exportProgress,migrateLegacyMemoryState};
