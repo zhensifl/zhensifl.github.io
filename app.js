@@ -98,17 +98,34 @@ const TOO_BASIC_WORDS = new Set(`
   car cat dog man woman boy girl child children mother father mom dad brother sister book pen pencil table chair door window room house home school
   red blue green black white big small good bad new old hot cold day night week month year water food milk tea name
   go come get give take make say tell see look know think want like love eat drink sleep sit stand walk run read write
+  when time people how first way where even really right why still never life world great last best such long something same
+  part always better find high since own thing place again next end show feel sure ever keep please put free second someone
+  away left number lot play until let real different set already anything nothing person today enough everything full live
+  point yet hard mean once stop believe head far side try actually later less line open thank everyone whole face kind hope
+  able early young ago half hand mind often single body guy true almost
+  back well need work use help game team family money city company group top care start music call job party service area
+  story course health important news information local video social talk fact level office pay large several win wrong along
+  anyone else matter pretty air bit friend hit nice class close idea past possible cause due happy human move question wait ask
+  late special watch future light low short stay age buy deal reason soon turn check form heart act fire fun phone art behind
+  easy near plan quite final front list ready sometimes son street bring example experience meet type baby chance song study
+  word clear outside self board cost cut field main moment road per oh non
+  town hear rest wife beautiful date land miss strong hour sorry answer learn alone bank movie park cool sound usually save
+  stuff drive fall fast picture size step hey key page cup football hate
+  morning breakfast kitchen clean quiet hungry cheap price cash hobby weekend together interesting remember
+  mr mrs ms god john james david michael robert mary york london america american british england english china chinese japan
+  january february march april june july august september october november december monday tuesday wednesday thursday friday saturday sunday
+  north south east west x l tv re gonna wanna yeah okay ok
 `.trim().split(/\s+/));
-const EXCLUDED_WORDS = new Set("murder suicide".split(" "));
+const EXCLUDED_WORDS = new Set("murder suicide kill killed killing killer gun shot shooting attack war death dead blood sex sexual porn church king queen god hell lord damn french european united".split(" "));
 const DICTIONARY_BY_EN = new Map((window.WORD_DATA||[]).map(word=>[word.en.toLowerCase(),word]));
 const ALL_WORDS = [...CURATED_WORDS,...(window.WORD_DATA||[])].map((word,index)=>({...word,pos:partOfSpeech(word),id:index+1,isCurated:index<CURATED_WORDS.length}));
-function isUsefulVocabulary(word){return !EXCLUDED_WORDS.has(word.en.toLowerCase())&&!/(?:男子名|女子名|人名|城市名|州名|国家名)/.test(word.zh)}
+function isUsefulVocabulary(word){return word.en.length>=3&&!word.base&&!EXCLUDED_WORDS.has(word.en.toLowerCase())&&!/(?:男子名|女子名|人名|城市名|州名|国家名|国名|首都)/.test(word.zh)}
 const vocabularySeen=new Set();
-const WORDS = ALL_WORDS.filter(word=>{const key=word.en.toLowerCase();if(vocabularySeen.has(key))return false;if(!word.isCurated&&(TOO_BASIC_WORDS.has(key)||!isUsefulVocabulary(word)))return false;vocabularySeen.add(key);return true});
+const WORDS = ALL_WORDS.filter(word=>{const key=word.en.toLowerCase();if(vocabularySeen.has(key))return false;if(TOO_BASIC_WORDS.has(key)||(!word.isCurated&&!isUsefulVocabulary(word)))return false;vocabularySeen.add(key);return true});
 
 const STORAGE_KEY = "wordstep-state-v1";
 const AUTH_STORAGE_KEY = "wordstep-auth-v1";
-const APP_VERSION = "20260830-2";
+const APP_VERSION = "20260830-3";
 const SUPABASE_URL = "https://wgvxdzwrvgktcidmofit.supabase.co";
 const SUPABASE_KEY = "sb_publishable_O2PaZM-nTJKAaeUYKiXbBw_r4WmllMx";
 const DAY = 86400000;

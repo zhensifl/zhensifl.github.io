@@ -245,4 +245,4 @@ syncProgress=async(notify=false)=>{
 
 document.addEventListener("keydown",event=>{if(event.key==="Escape"&&document.querySelector("#placement-modal").classList.contains("active"))setModalOpen("#placement-modal",false)});
 populateEnhancedSettings();renderDashboard();renderLibrary();renderProgress();consumeRecoveryLink();setTimeout(()=>{if(!state.placementDone&&!Object.keys(state.words).length)openPlacement(true)},700);
-window.WordStepEnhancements={version:"20260830-2",retrievability,nextSchedule,openPlacement,exportProgress,migrateLegacyMemoryState};
+window.WordStepEnhancements={version:"20260830-3",retrievability,nextSchedule,openPlacement,exportProgress,migrateLegacyMemoryState};
