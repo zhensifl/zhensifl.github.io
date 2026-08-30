@@ -146,7 +146,7 @@ function modeForQuestion(){if(state.trainingMode==="mixed")return session.idx%3=
 openSession=()=>{
   if(!state.placementDone&&!Object.keys(state.words).length){openPlacement(true);return}
   let queue=todayQueue(),isExtra=false;if(!queue.length){queue=weakWords().slice(0,Math.max(5,Math.min(state.reviewLimit,state.dailyGoal)));isExtra=true}if(!queue.length){showToast("当前等级已完成，可以在设置中切换下一个等级");return}
-  session={queue,idx:0,phase:"choice",correct:0,errors:0,unknowns:0,listening:0,isExtra,currentHadError:false,currentErrorCount:0,currentUnknown:false,forceCorrection:false,currentQuestionType:null};
+  session={queue,idx:0,phase:"choice",correct:0,errors:0,unknowns:0,listening:0,isExtra,studyDate:localDate(),currentHadError:false,currentErrorCount:0,currentUnknown:false,forceCorrection:false,currentQuestionType:null};
   document.querySelector("#session-overlay").classList.add("active");document.querySelector("#session-overlay").setAttribute("aria-hidden","false");renderQuestion();
 };
 document.querySelector("#start-session").onclick=openSession;
@@ -184,8 +184,8 @@ checkSpelling=value=>{
 
 finishWord=(rating="good")=>{
   const word=currentWord(),record=ws(word.id),wasNew=record.stage<0,schedule=nextSchedule(record,rating,wasNew),unknownTotal=session.currentUnknown?(record.unknowns||0)+1:Math.max(0,(record.unknowns||0)-(session.currentHadError?0:1));
-  state.words[word.id]={...record,stage:memoryStage(schedule.stability),due:dayStart()+schedule.interval*DAY,errors:(record.errors||0)+session.currentErrorCount,unknowns:unknownTotal,correct:(record.correct||0)+(!session.currentHadError?1:0),seen:(record.seen||0)+1,lastSeen:localDate(),learnedOn:record.learnedOn||(wasNew?localDate():null),stability:schedule.stability,difficulty:schedule.difficulty,lapses:(record.lapses||0)+(rating==="again"?1:0),lastReviewAt:Date.now(),lastRating:rating,modifiedAt:Date.now()};
-  const key=localDate(),activity=state.activity[key]||{},ratings={...(activity.ratings||{})};ratings[rating]=(ratings[rating]||0)+1;state.activity[key]={...activity,completed:(activity.completed||0)+1,reviews:(activity.reviews||0)+(wasNew?0:1),new:(activity.new||0)+(wasNew?1:0),spelling:(activity.spelling||0)+1,attempts:(activity.attempts||0)+1,correct:(activity.correct||0)+(!session.currentHadError?1:0),errors:(activity.errors||0)+session.currentErrorCount,listening:(activity.listening||0)+(["listening","dictation"].includes(session.currentQuestionType)?1:0),ratings};state.lastStudyDate=key;saveState();
+  const key=session.studyDate||localDate();state.words[word.id]={...record,stage:memoryStage(schedule.stability),due:dayStart()+schedule.interval*DAY,errors:(record.errors||0)+session.currentErrorCount,unknowns:unknownTotal,correct:(record.correct||0)+(!session.currentHadError?1:0),seen:(record.seen||0)+1,lastSeen:key,learnedOn:record.learnedOn||(wasNew?key:null),stability:schedule.stability,difficulty:schedule.difficulty,lapses:(record.lapses||0)+(rating==="again"?1:0),lastReviewAt:Date.now(),lastRating:rating,modifiedAt:Date.now()};
+  const activity=state.activity[key]||{},ratings={...(activity.ratings||{})};ratings[rating]=(ratings[rating]||0)+1;state.activity[key]={...activity,completed:(activity.completed||0)+1,reviews:(activity.reviews||0)+(wasNew?0:1),new:(activity.new||0)+(wasNew?1:0),spelling:(activity.spelling||0)+1,attempts:(activity.attempts||0)+1,correct:(activity.correct||0)+(!session.currentHadError?1:0),errors:(activity.errors||0)+session.currentErrorCount,listening:(activity.listening||0)+(["listening","dictation"].includes(session.currentQuestionType)?1:0),ratings};state.lastStudyDate=key;saveState();
   session.idx++;session.phase="choice";session.currentHadError=false;session.currentErrorCount=0;session.currentUnknown=false;session.forceCorrection=false;session.currentQuestionType=null;if(session.idx>=session.queue.length)renderComplete();else renderQuestion();
 };
 
@@ -245,4 +245,4 @@ syncProgress=async(notify=false)=>{
 
 document.addEventListener("keydown",event=>{if(event.key==="Escape"&&document.querySelector("#placement-modal").classList.contains("active"))setModalOpen("#placement-modal",false)});
 populateEnhancedSettings();renderDashboard();renderLibrary();renderProgress();consumeRecoveryLink();setTimeout(()=>{if(!state.placementDone&&!Object.keys(state.words).length)openPlacement(true)},700);
-window.WordStepEnhancements={version:"20260830-3",retrievability,nextSchedule,openPlacement,exportProgress,migrateLegacyMemoryState};
+window.WordStepEnhancements={version:"20260830-4",retrievability,nextSchedule,openPlacement,exportProgress,migrateLegacyMemoryState};

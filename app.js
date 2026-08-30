@@ -125,7 +125,7 @@ const WORDS = ALL_WORDS.filter(word=>{const key=word.en.toLowerCase();if(vocabul
 
 const STORAGE_KEY = "wordstep-state-v1";
 const AUTH_STORAGE_KEY = "wordstep-auth-v1";
-const APP_VERSION = "20260830-3";
+const APP_VERSION = "20260830-4";
 const SUPABASE_URL = "https://wgvxdzwrvgktcidmofit.supabase.co";
 const SUPABASE_KEY = "sb_publishable_O2PaZM-nTJKAaeUYKiXbBw_r4WmllMx";
 const DAY = 86400000;
@@ -348,7 +348,7 @@ function shuffle(a){return [...a].sort(()=>Math.random()-.5)}
 function distractorWords(word){return shuffle(WORDS.filter(w=>w.id!==word.id&&w.en!==word.en&&w.category===word.category&&conciseMeaning(w.zh)!==conciseMeaning(word.zh))).slice(0,3)}
 function openSession(){
   let queue=todayQueue(),isExtra=false;if(!queue.length){queue=weakWords().slice(0,Math.max(5,state.dailyGoal));isExtra=true}if(!queue.length){showToast("全部词汇都完成了，太棒了！");return}
-  session={queue,idx:0,phase:"choice",correct:0,errors:0,unknowns:0,isExtra,currentHadError:false,currentErrorCount:0,currentUnknown:false,forceCorrection:false};
+  session={queue,idx:0,phase:"choice",correct:0,errors:0,unknowns:0,isExtra,studyDate:localDate(),currentHadError:false,currentErrorCount:0,currentUnknown:false,forceCorrection:false};
   document.querySelector("#session-overlay").classList.add("active");document.querySelector("#session-overlay").setAttribute("aria-hidden","false");renderQuestion();
 }
 function currentWord(){return session.queue[session.idx]}
@@ -377,8 +377,8 @@ function finishWord(){
   const w=currentWord(),s=ws(w.id),wasNew=s.stage<0;let stage=s.stage;
   if(session.currentUnknown)stage=0;else if(session.currentHadError)stage=Math.max(0,stage-1);else stage=Math.min(STAGE_DAYS.length-1,stage+1);
   if(wasNew)stage=0;const unknownTotal=session.currentUnknown?(s.unknowns||0)+1:Math.max(0,(s.unknowns||0)-(session.currentHadError?0:1)),errorPenalty=Math.min(0.75,(s.errors+session.currentErrorCount)*.08+unknownTotal*.1),interval=Math.max(1,Math.round(STAGE_DAYS[stage]*(1-errorPenalty)));
-  state.words[w.id]={...s,stage,due:dayStart()+interval*DAY,errors:s.errors+session.currentErrorCount,unknowns:unknownTotal,correct:s.correct+(!session.currentHadError?1:0),seen:s.seen+1,lastSeen:localDate(),learnedOn:s.learnedOn||(wasNew?localDate():null),modifiedAt:Date.now()};
-  const key=localDate(),a=state.activity[key]||{};state.activity[key]={completed:(a.completed||0)+1,reviews:(a.reviews||0)+(wasNew?0:1),new:(a.new||0)+(wasNew?1:0),spelling:(a.spelling||0)+1};state.lastStudyDate=key;saveState();
+  const key=session.studyDate||localDate();state.words[w.id]={...s,stage,due:dayStart()+interval*DAY,errors:s.errors+session.currentErrorCount,unknowns:unknownTotal,correct:s.correct+(!session.currentHadError?1:0),seen:s.seen+1,lastSeen:key,learnedOn:s.learnedOn||(wasNew?key:null),modifiedAt:Date.now()};
+  const a=state.activity[key]||{};state.activity[key]={completed:(a.completed||0)+1,reviews:(a.reviews||0)+(wasNew?0:1),new:(a.new||0)+(wasNew?1:0),spelling:(a.spelling||0)+1};state.lastStudyDate=key;saveState();
   session.idx++;session.phase="choice";session.currentHadError=false;session.currentErrorCount=0;session.currentUnknown=false;session.forceCorrection=false;if(session.idx>=session.queue.length)renderComplete();else renderQuestion();
 }
 function renderComplete(){document.querySelector("#session-progress-bar").style.width="100%";document.querySelector("#session-step").textContent="完成";document.querySelector("#study-card").innerHTML=`<div class="completion-icon">✓</div><span class="question-type">TODAY COMPLETE</span><h2 class="question-main chinese">今天的训练完成了！</h2><p class="question-note">记忆不靠一次记住，而靠每次及时回来。</p><div class="completion-stats"><div><strong>${session.queue.length}</strong><span>完成词数</span></div><div><strong>${session.correct}</strong><span>正确拼写</span></div><div><strong>${session.errors}</strong><span>纠正次数</span></div></div><button class="primary-button" id="finish-session">返回首页</button>`;document.querySelector("#finish-session").onclick=closeSession}
