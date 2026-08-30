@@ -175,14 +175,10 @@ renderSpelling=()=>{
   const input=document.querySelector("#spell-input");input.focus();document.querySelector("#spell-form").onsubmit=event=>{event.preventDefault();checkSpelling(input.value)};document.querySelector("#spell-unknown").onclick=markSpellingUnknown;if(dictation){session.listening++;setTimeout(()=>speakWord(word.en),100)}
 };
 
-function ratingButtons(word){
-  const record=ws(word.id),wasNew=record.stage<0,defaultRating=session.currentUnknown?"again":session.currentHadError?"hard":"good";
-  return `<div class="rating-panel"><span class="rating-label">这次记得怎么样？系统会据此安排下次复习</span><div class="rating-grid">${Object.keys(RATING_LABELS).map(rating=>{const preview=nextSchedule(record,rating,wasNew);return `<button type="button" class="rating-button ${rating===defaultRating?"default":""}" ${rating===defaultRating?'id="next-word"':""} data-rating="${rating}"><strong>${RATING_LABELS[rating]}</strong><small>${preview.interval} 天后</small></button>`}).join("")}</div></div>`;
-}
 checkSpelling=value=>{
   const word=currentWord(),input=document.querySelector("#spell-input"),normalized=value.trim().toLowerCase();
   if(normalized===word.en.toLowerCase()){
-    input.classList.add("success");input.disabled=true;document.querySelector(".spell-actions").hidden=true;session.correct++;const label=session.forceCorrection?"重新拼对了，这次会记得更牢。":"拼写正确！";document.querySelector("#spell-feedback").innerHTML=`<div class="feedback success has-rating"><div><strong>✓ ${label}</strong><span class="phonetic feedback-phonetic">${escapeAttr(word.phonetic)}</span>${ratingButtons(word)}</div><div class="feedback-actions"><button type="button" class="speak-button" data-speak="${escapeAttr(word.en)}" aria-label="朗读 ${escapeAttr(word.en)}">🔊</button></div></div>`;document.querySelectorAll("[data-rating]").forEach(button=>button.onclick=()=>finishWord(button.dataset.rating));
+    const automaticRating=session.currentUnknown?"again":session.currentHadError?"hard":"good";input.classList.add("success");input.disabled=true;document.querySelector(".spell-actions").hidden=true;session.correct++;const label=session.forceCorrection?"重新拼对了，这次会记得更牢。":"拼写正确！";document.querySelector("#spell-feedback").innerHTML=`<div class="feedback success"><div><strong>✓ ${label}</strong><span class="phonetic feedback-phonetic">${escapeAttr(word.phonetic)}</span></div><div class="feedback-actions"><button type="button" class="speak-button" data-speak="${escapeAttr(word.en)}" aria-label="朗读 ${escapeAttr(word.en)}">🔊</button><button type="button" class="continue-button" id="next-word">继续 →</button></div></div>`;document.querySelector("#next-word").onclick=()=>finishWord(automaticRating);
   }else{session.errors++;session.currentErrorCount++;session.currentHadError=true;session.forceCorrection=true;showSpellingCorrection()}
 };
 
@@ -193,7 +189,7 @@ finishWord=(rating="good")=>{
   session.idx++;session.phase="choice";session.currentHadError=false;session.currentErrorCount=0;session.currentUnknown=false;session.forceCorrection=false;session.currentQuestionType=null;if(session.idx>=session.queue.length)renderComplete();else renderQuestion();
 };
 
-renderComplete=()=>{const accuracy=session.queue.length?Math.round((session.queue.length-Math.min(session.queue.length,session.errors))/session.queue.length*100):100;document.querySelector("#session-progress-bar").style.width="100%";document.querySelector("#session-step").textContent="完成";document.querySelector("#study-card").innerHTML=`<div class="completion-icon">✓</div><span class="question-type">TODAY COMPLETE</span><h2 class="question-main chinese">今天的训练完成了！</h2><p class="question-note">动态记忆模型已经根据你的反馈安排好下一次复习。</p><div class="completion-stats"><div><strong>${session.queue.length}</strong><span>完成词数</span></div><div><strong>${accuracy}%</strong><span>本组准确率</span></div><div><strong>${session.listening}</strong><span>听力练习</span></div></div><button class="primary-button" id="finish-session">返回首页</button>`;document.querySelector("#finish-session").onclick=closeSession};
+renderComplete=()=>{const accuracy=session.queue.length?Math.round((session.queue.length-Math.min(session.queue.length,session.errors))/session.queue.length*100):100;document.querySelector("#session-progress-bar").style.width="100%";document.querySelector("#session-step").textContent="完成";document.querySelector("#study-card").innerHTML=`<div class="completion-icon">✓</div><span class="question-type">TODAY COMPLETE</span><h2 class="question-main chinese">今天的训练完成了！</h2><p class="question-note">动态记忆模型已经根据本次答题表现安排好下一次复习。</p><div class="completion-stats"><div><strong>${session.queue.length}</strong><span>完成词数</span></div><div><strong>${accuracy}%</strong><span>本组准确率</span></div><div><strong>${session.listening}</strong><span>听力练习</span></div></div><button class="primary-button" id="finish-session">返回首页</button>`;document.querySelector("#finish-session").onclick=closeSession};
 
 renderDashboard=()=>{
   const allDue=dueWords(),scheduled=allDue.slice(0,state.reviewLimit),fresh=Math.min(newAllowance(),unseenWords().length),weak=weakWords().length,total=scheduled.length+fresh,backlog=Math.max(0,allDue.length-scheduled.length);
@@ -249,4 +245,4 @@ syncProgress=async(notify=false)=>{
 
 document.addEventListener("keydown",event=>{if(event.key==="Escape"&&document.querySelector("#placement-modal").classList.contains("active"))setModalOpen("#placement-modal",false)});
 populateEnhancedSettings();renderDashboard();renderLibrary();renderProgress();consumeRecoveryLink();setTimeout(()=>{if(!state.placementDone&&!Object.keys(state.words).length)openPlacement(true)},700);
-window.WordStepEnhancements={version:"20260830-1",retrievability,nextSchedule,openPlacement,exportProgress,migrateLegacyMemoryState};
+window.WordStepEnhancements={version:"20260830-2",retrievability,nextSchedule,openPlacement,exportProgress,migrateLegacyMemoryState};
