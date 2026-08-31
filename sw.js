@@ -1,5 +1,5 @@
-const CACHE_NAME="wordstep-20260831-4";
-const CORE=["./","./index.html","./styles.css","./words-data.js","./cefr-levels.js","./app-20260831-4.js","./enhancements-20260831-4.js","./manifest.webmanifest","./icon.svg","./version.json"];
+const CACHE_NAME="wordstep-20260901-1";
+const CORE=["./","./index.html","./styles.css","./words-data.js","./cefr-levels.js","./app-20260901-1.js","./enhancements-20260901-1.js","./manifest.webmanifest","./icon.svg","./version.json"];
 self.addEventListener("install",event=>event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(CORE)).then(()=>self.skipWaiting())));
 self.addEventListener("activate",event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE_NAME).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
 self.addEventListener("message",event=>{if(event.data?.type==="SKIP_WAITING")self.skipWaiting()});
