@@ -1,6 +1,11 @@
-const CACHE_NAME="wordstep-20260901-2";
-const CORE=["./","./index.html","./styles.css","./words-data.js","./cefr-levels.js","./app-20260901-2.js","./enhancements-20260901-2.js","./manifest.webmanifest","./icon.svg","./version.json"];
-self.addEventListener("install",event=>event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(CORE)).then(()=>self.skipWaiting())));
+const CACHE_NAME="wordstep-20260901-3";
+const SHELL=["./","./index.html","./styles.css","./app-20260901-3.js","./enhancements-20260901-3.js","./manifest.webmanifest","./icon.svg","./version.json"];
+const DATA=["./words-data.js","./cefr-levels.js"];
+const NAVIGATION_TIMEOUT=2200;
+self.addEventListener("install",event=>event.waitUntil(caches.open(CACHE_NAME).then(async cache=>{
+  await cache.addAll(SHELL);
+  await Promise.allSettled(DATA.map(asset=>cache.add(asset)));
+}).then(()=>self.skipWaiting())));
 self.addEventListener("activate",event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE_NAME).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
 self.addEventListener("message",event=>{if(event.data?.type==="SKIP_WAITING")self.skipWaiting()});
 self.addEventListener("fetch",event=>{
@@ -11,7 +16,25 @@ self.addEventListener("fetch",event=>{
     return;
   }
   if(request.mode==="navigate"){
-    event.respondWith(fetch(request).then(response=>{const copy=response.clone();caches.open(CACHE_NAME).then(cache=>cache.put("./index.html",copy));return response}).catch(()=>caches.match("./index.html")));
+    const network=fetch(request).then(response=>{if(response.ok)caches.open(CACHE_NAME).then(cache=>cache.put("./index.html",response.clone()));return response});
+    if(url.searchParams.get("source")==="pwa"){
+      event.respondWith(caches.open(CACHE_NAME).then(cache=>cache.match("./index.html")).then(cached=>cached||network).catch(()=>network));
+      event.waitUntil(network.catch(()=>{}));
+      return;
+    }
+    const timeout=new Promise((_,reject)=>setTimeout(()=>reject(new Error("navigation timeout")),NAVIGATION_TIMEOUT));
+    event.respondWith(Promise.race([network,timeout]).catch(()=>caches.open(CACHE_NAME).then(cache=>cache.match("./index.html"))));
+    event.waitUntil(network.catch(()=>{}));
+    return;
+  }
+  if(url.pathname.endsWith("/words-data.js")||url.pathname.endsWith("/cefr-levels.js")){
+    event.respondWith(caches.open(CACHE_NAME).then(async cache=>{
+      const cached=await cache.match(url.pathname.endsWith("/words-data.js")?"./words-data.js":"./cefr-levels.js");
+      if(cached)return cached;
+      const response=await fetch(request);
+      if(response.ok)await cache.put(url.pathname.endsWith("/words-data.js")?"./words-data.js":"./cefr-levels.js",response.clone());
+      return response;
+    }));
     return;
   }
   event.respondWith(fetch(request).then(response=>{if(response.ok){const copy=response.clone();caches.open(CACHE_NAME).then(cache=>cache.put(request,copy))}return response}).catch(()=>caches.match(request,{ignoreSearch:true})));
