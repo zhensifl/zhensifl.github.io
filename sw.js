@@ -1,12 +1,12 @@
-const CACHE_NAME="wordstep-20260903-1";
-const SHELL=["./","./index.html","./styles.css","./app-20260903-1.js","./enhancements-20260903-1.js","./manifest.webmanifest","./icon.svg","./icon-32.png","./icon-192.png","./icon-512.png","./icon-maskable-512.png","./apple-touch-icon.png","./version.json"];
+const CACHE_NAME="wordstep-20260905-1";
+const SHELL=["./","./index.html","./styles.css","./app-20260905-1.js","./enhancements-20260905-1.js","./manifest.webmanifest","./icon.svg","./icon-32.png","./icon-192.png","./icon-512.png","./icon-maskable-512.png","./apple-touch-icon.png","./version.json"];
 const DATA=["./words-data.js","./cefr-levels.js"];
 const NAVIGATION_TIMEOUT=2200;
 self.addEventListener("install",event=>event.waitUntil(caches.open(CACHE_NAME).then(async cache=>{
   await cache.addAll(SHELL);
-  await Promise.allSettled(DATA.map(asset=>cache.add(asset)));
+  await cache.addAll(DATA);
 }).then(()=>self.skipWaiting())));
-self.addEventListener("activate",event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE_NAME).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
+self.addEventListener("activate",event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith("wordstep-")&&key!==CACHE_NAME).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
 self.addEventListener("message",event=>{if(event.data?.type==="SKIP_WAITING")self.skipWaiting()});
 self.addEventListener("fetch",event=>{
   const request=event.request,url=new URL(request.url);
@@ -16,7 +16,7 @@ self.addEventListener("fetch",event=>{
     return;
   }
   if(request.mode==="navigate"){
-    const network=fetch(request).then(response=>{if(response.ok)caches.open(CACHE_NAME).then(cache=>cache.put("./index.html",response.clone()));return response});
+    const network=fetch(request).then(async response=>{if(!response.ok)throw new Error("navigation unavailable");return response});
     if(url.searchParams.get("source")==="pwa"){
       event.respondWith(caches.open(CACHE_NAME).then(cache=>cache.match("./index.html")).then(cached=>cached||network).catch(()=>network));
       event.waitUntil(network.catch(()=>{}));
@@ -29,6 +29,8 @@ self.addEventListener("fetch",event=>{
   }
   if(url.pathname.endsWith("/words-data.js")||url.pathname.endsWith("/cefr-levels.js")){
     event.respondWith(caches.open(CACHE_NAME).then(async cache=>{
+      const version=url.searchParams.get("v");
+      if(version&&CACHE_NAME!==`wordstep-${version}`)return fetch(request,{cache:"no-store"});
       const cached=await cache.match(url.pathname.endsWith("/words-data.js")?"./words-data.js":"./cefr-levels.js");
       if(cached)return cached;
       const response=await fetch(request);
@@ -37,5 +39,5 @@ self.addEventListener("fetch",event=>{
     }));
     return;
   }
-  event.respondWith(fetch(request).then(response=>{if(response.ok){const copy=response.clone();caches.open(CACHE_NAME).then(cache=>cache.put(request,copy))}return response}).catch(()=>caches.match(request,{ignoreSearch:true})));
+  event.respondWith(fetch(request).then(response=>{if(!response.ok)throw new Error("asset unavailable");const copy=response.clone();caches.open(CACHE_NAME).then(cache=>cache.put(request,copy)).catch(()=>{});return response}).catch(()=>caches.match(request,{ignoreSearch:true})));
 });
