@@ -1,6 +1,8 @@
 /* Reviewed senses applied before word IDs and study cards are constructed. */
 (() => {
-  const corrections={
+const corrections={
+  roughly:["adv. 大约；差不多","The repairs will cost roughly 500 yuan.","维修费用大约为500元。","/ˈrʌfli/"],
+  spaghetti:["n. 意大利面","I ordered spaghetti for dinner.","晚餐我点了意大利面。","/spəˈɡeti/"],
     hospice:['n. 临终关怀机构','She works as a nurse at a hospice.','她在一家临终关怀机构担任护士。','/ˈhɒspɪs/'],
     headquarters:['n. 总部；总公司','Our company moved its headquarters to a larger building.','我们公司把总部搬到了一栋更大的楼里。','/ˌhedˈkwɔːtəz/'],
     shank:['n. 小腿','The shank is the part of the leg between the knee and the ankle.','小腿是膝盖和脚踝之间的腿部。','/ʃæŋk/'],
