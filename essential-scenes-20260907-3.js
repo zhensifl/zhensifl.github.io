@@ -16,7 +16,7 @@ window.WORDSTEP_ESSENTIAL_WORDS=[
   ["emergency","n. 紧急情况","Call this number in an emergency.","遇到紧急情况时拨打这个号码。","健康身体","/ɪˈmɜːrdʒənsi/","in an emergency","在紧急情况下"],
   ["treatment","n. 治疗","She is receiving treatment at the hospital.","她正在医院接受治疗。","健康身体","/ˈtriːtmənt/","receive treatment","接受治疗"],
   ["airport","n. 机场","Please arrive at the airport two hours early.","请提前两小时到达机场。","出行问路","/ˈerpɔːrt/","arrive at the airport","到达机场"],
-  ["flight","n. 航班；飞行","Our flight leaves at nine tomorrow morning.","我们的航班明早九点起飞。","出行问路","/flaɪt/","catch a flight","赶航班"],
+  ["flight","n. 航班；飞行","We left early because we didn't want to miss our flight.","我们提前出发，因为不想误机。","出行问路","/flaɪt/","miss a flight","误机"],
   ["manager","n. 经理；主管","Please send the report to your manager.","请把报告发给你的主管。","办公沟通","/ˈmænɪdʒər/","report to a manager","向主管汇报"],
   ["contract","n. 合同","We need to sign the contract today.","我们今天需要签署合同。","办公沟通","/ˈkɒntrækt/","sign a contract","签署合同"],
   ["budget","n. 预算","The project must stay within budget.","这个项目必须控制在预算内。","办公沟通","/ˈbʌdʒɪt/","stay within budget","控制在预算内"],
