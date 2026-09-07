@@ -35,5 +35,6 @@
 #settings-modal .modal{max-height:calc(100vh - 34px);overflow:auto}
 body{font-family:"Segoe UI","PingFang SC","Microsoft YaHei",Arial,sans-serif}
 .phrase-hint{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;margin:10px 0 14px;padding:10px 12px;border-radius:12px;background:#f3eefc;color:#35204f;text-align:left}.phrase-hint span{font-size:9px;color:#7858ae;font-weight:700;letter-spacing:.08em}.phrase-hint strong{font-size:12px}.phrase-hint small{font-size:10px;color:var(--muted)}
+.phrase-hint.masked{border:1px dashed #c7b5e8;background:#faf8ff}.phrase-hint.masked strong{letter-spacing:.03em;color:#5b3aa9}
 @media(max-width:680px){.phrase-hint{grid-template-columns:auto 1fr}.phrase-hint small{grid-column:2}}
 body.session-open{overflow:hidden}.session-overlay.active{animation:none;opacity:1;isolation:isolate}
