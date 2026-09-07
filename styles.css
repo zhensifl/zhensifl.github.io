@@ -34,3 +34,6 @@
 @media(max-width:680px){.placement-banner{display:block;padding:19px}.placement-banner .primary-button{width:100%;margin-top:14px}.compact-select{width:100%;margin-bottom:10px}.settings-grid,.settings-actions{grid-template-columns:1fr}.placement-options{grid-template-columns:1fr}.insight-grid{grid-template-columns:1fr}.progress-detail-grid{grid-template-columns:1fr}.rating-grid{grid-template-columns:1fr 1fr}.rating-panel{width:100%}.feedback.has-rating{display:block}.feedback.has-rating .feedback-actions{margin-top:10px;justify-content:flex-end}.scene-row{grid-template-columns:70px 1fr 30px}}
 #settings-modal .modal{max-height:calc(100vh - 34px);overflow:auto}
 body{font-family:"Segoe UI","PingFang SC","Microsoft YaHei",Arial,sans-serif}
+.phrase-hint{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;margin:10px 0 14px;padding:10px 12px;border-radius:12px;background:#f3eefc;color:#35204f;text-align:left}.phrase-hint span{font-size:9px;color:#7858ae;font-weight:700;letter-spacing:.08em}.phrase-hint strong{font-size:12px}.phrase-hint small{font-size:10px;color:var(--muted)}
+@media(max-width:680px){.phrase-hint{grid-template-columns:auto 1fr}.phrase-hint small{grid-column:2}}
+body.session-open{overflow:hidden}.session-overlay.active{animation:none;opacity:1;isolation:isolate}
