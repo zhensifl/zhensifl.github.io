@@ -1,9 +1,9 @@
-const CACHE_NAME="wordstep-20260907-6";
-const SHELL=["./","./index.html","./styles.css","./app-20260907-6.js","./enhancements-20260907-6.js","./sync-model-20260907-6.js","./manifest.webmanifest","./icon.svg","./icon-32.png","./icon-192.png","./icon-512.png","./icon-maskable-512.png","./apple-touch-icon.png","./version.json"];
-const DATA=["./words-data.js","./cefr-levels.js"];
+const CACHE_NAME="wordstep-20260907-7";
+const SHELL=["./","./index.html","./styles.css","./app-20260907-7.js","./enhancements-20260907-7.js","./sync-model-20260907-7.js","./manifest.webmanifest","./icon.svg","./icon-32.png","./icon-192.png","./icon-512.png","./icon-maskable-512.png","./apple-touch-icon.png","./version.json"];
+const DATA=["./compact-words-20260907-7.js"];
 const NAVIGATION_TIMEOUT=2200;
 self.addEventListener("install",event=>event.waitUntil(caches.open(CACHE_NAME).then(async cache=>{
-  await cache.addAll([...SHELL,"./vocabulary-refinements-20260907-2.js","./vocabulary-corrections-20260906-1.js","./vocabulary-focus-20260907-2.js","./essential-scenes-20260907-3.js","./daily-communication-20260907-4.js"]);
+  await cache.addAll(SHELL);
   await cache.addAll(DATA);
 }).then(()=>self.skipWaiting())));
 self.addEventListener("activate",event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith("wordstep-")&&key!==CACHE_NAME).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
@@ -27,14 +27,14 @@ self.addEventListener("fetch",event=>{
     event.waitUntil(network.catch(()=>{}));
     return;
   }
-  if(url.pathname.endsWith("/words-data.js")||url.pathname.endsWith("/cefr-levels.js")){
+  if(url.pathname.endsWith("/compact-words-20260907-7.js")){
     event.respondWith(caches.open(CACHE_NAME).then(async cache=>{
       const version=url.searchParams.get("v");
       if(version&&CACHE_NAME!==`wordstep-${version}`)return fetch(request,{cache:"no-store"});
-      const cached=await cache.match(url.pathname.endsWith("/words-data.js")?"./words-data.js":"./cefr-levels.js");
+      const cached=await cache.match("./compact-words-20260907-7.js");
       if(cached)return cached;
       const response=await fetch(request);
-      if(response.ok)await cache.put(url.pathname.endsWith("/words-data.js")?"./words-data.js":"./cefr-levels.js",response.clone());
+      if(response.ok)await cache.put("./compact-words-20260907-7.js",response.clone());
       return response;
     }));
     return;
