@@ -1,6 +1,6 @@
-const CACHE_NAME="wordstep-20260907-8";
-const SHELL=["./","./index.html","./styles.css","./app-20260907-8.js","./enhancements-20260907-8.js","./sync-model-20260907-8.js","./manifest.webmanifest","./icon.svg","./icon-32.png","./icon-192.png","./icon-512.png","./icon-maskable-512.png","./apple-touch-icon.png","./version.json"];
-const DATA=["./compact-words-20260907-7.js"];
+const CACHE_NAME="wordstep-20260913-1";
+const SHELL=["./","./index.html","./styles.css","./app-20260913-1.js","./enhancements-20260913-1.js","./sync-model-20260913-1.js","./manifest.webmanifest","./icon.svg","./icon-32.png","./icon-192.png","./icon-512.png","./icon-maskable-512.png","./apple-touch-icon.png","./version.json"];
+const DATA=["./compact-words-20260913-1.js"];
 const NAVIGATION_TIMEOUT=2200;
 self.addEventListener("install",event=>event.waitUntil(caches.open(CACHE_NAME).then(async cache=>{
   await cache.addAll(SHELL);
@@ -27,14 +27,14 @@ self.addEventListener("fetch",event=>{
     event.waitUntil(network.catch(()=>{}));
     return;
   }
-  if(url.pathname.endsWith("/compact-words-20260907-7.js")){
+  if(url.pathname.endsWith("/compact-words-20260913-1.js")){
     event.respondWith(caches.open(CACHE_NAME).then(async cache=>{
       const version=url.searchParams.get("v");
       if(version&&CACHE_NAME!==`wordstep-${version}`)return fetch(request,{cache:"no-store"});
-      const cached=await cache.match("./compact-words-20260907-7.js");
+      const cached=await cache.match("./compact-words-20260913-1.js");
       if(cached)return cached;
       const response=await fetch(request);
-      if(response.ok)await cache.put("./compact-words-20260907-7.js",response.clone());
+      if(response.ok)await cache.put("./compact-words-20260913-1.js",response.clone());
       return response;
     }));
     return;
