@@ -150,7 +150,7 @@ const WORDS = ALL_WORDS.filter(word=>{const key=word.en.toLowerCase();if(vocabul
 
 const STORAGE_KEY = "wordstep-state-v1";
 const AUTH_STORAGE_KEY = "wordstep-auth-v1";
-const APP_VERSION = "20260913-1";
+const APP_VERSION = "20260918-1";
 const SUPABASE_URL = "https://wgvxdzwrvgktcidmofit.supabase.co";
 const SUPABASE_KEY = "sb_publishable_O2PaZM-nTJKAaeUYKiXbBw_r4WmllMx";
 const DAY = 86400000;
@@ -282,42 +282,54 @@ function newAllowance(){return Math.max(0,state.dailyGoal-learnedToday())}
 function todayQueue(){return [...dueWords(),...unseenWords().slice(0,newAllowance())]}
 function streak(){const days=Object.keys(state.activity).filter(k=>state.activity[k]?.completed>0).sort().reverse();if(!days.length)return 0;let cursor=dayStart(),count=0;const today=localDate();if(days[0]!==today)cursor-=DAY;while(days.includes(localDate(new Date(cursor)))){count++;cursor-=DAY}return count}
 function showToast(text){const el=document.querySelector("#toast");el.textContent=text;el.classList.add("show");setTimeout(()=>el.classList.remove("show"),2200)}
-let activeUtterance=null,activeSpeechText="",speechRequestId=0,speechStartTimer=null,lastSpeechClick=0,englishVoices=[];
+let activeUtterance=null,activeAudio=null,activeSpeechText="",speechRequestId=0,speechStartTimer=null,englishVoices=[],speechSourceMode="idle";
 function availableVoices(){return "speechSynthesis" in window?window.speechSynthesis.getVoices():[]}
 function refreshEnglishVoices(){englishVoices=availableVoices().filter(voice=>voice.lang?.toLowerCase().startsWith("en"));return englishVoices}
 function speechVoicePlan(){
-  const voices=availableVoices(),english=voices.filter(voice=>voice.lang?.toLowerCase().startsWith("en")),localEnglish=english.filter(voice=>voice.localService),localVoices=voices.filter(voice=>voice.localService),localChinese=localVoices.filter(voice=>voice.lang?.toLowerCase().startsWith("zh"));
+  const english=availableVoices().filter(voice=>voice.lang?.toLowerCase().startsWith("en")),localEnglish=english.filter(voice=>voice.localService);
   return [...new Set([
     localEnglish.find(voice=>voice.lang.toLowerCase()==="en-us"),
     localEnglish.find(voice=>voice.default),
     localEnglish[0],
-    localVoices.find(voice=>voice.default),
-    ...localChinese,
-    ...localVoices,
     english.find(voice=>voice.lang.toLowerCase()==="en-us"),
-    english[0]
+    english.find(voice=>voice.default),
+    ...english
   ].filter(Boolean))];
 }
 function preferredEnglishVoice(attempt=0){const plan=speechVoicePlan();return plan[Math.min(attempt,Math.max(0,plan.length-1))]||null}
+function waitForEnglishVoices(timeout=900){
+  if(refreshEnglishVoices().length||!("speechSynthesis" in window))return Promise.resolve(englishVoices);
+  return new Promise(resolve=>{let settled=false;const done=()=>{if(settled)return;settled=true;clearTimeout(timer);window.speechSynthesis.removeEventListener?.("voiceschanged",changed);resolve(refreshEnglishVoices())},changed=()=>{if(refreshEnglishVoices().length)done()},timer=setTimeout(done,timeout);window.speechSynthesis.addEventListener?.("voiceschanged",changed);window.speechSynthesis.getVoices()});
+}
+function pronunciationUrls(text){const word=encodeURIComponent(String(text).trim().toLowerCase());return [`https://dict.youdao.com/dictvoice?audio=${word}&type=2`,`https://dict.youdao.com/dictvoice?audio=${word}&type=1`,`https://fanyi.baidu.com/gettts?lan=en&text=${word}&spd=3&source=web`]}
 function updateSpeechButtons(text,status="idle"){
   document.querySelectorAll("[data-speak]").forEach(button=>{if(button.dataset.speak!==text)return;button.classList.toggle("speaking",status==="speaking");button.classList.toggle("speech-pending",status==="pending");button.classList.toggle("speech-error",status==="error");button.setAttribute("aria-busy",String(status==="pending"||status==="speaking"));button.textContent=status==="pending"?"…":status==="speaking"?"🔉":"🔊";button.title=status==="pending"?"正在准备发音":status==="speaking"?"正在播放":status==="error"?"播放失败，点击重试":"点击发音"});
 }
-function finishSpeech(requestId,status="idle"){if(requestId!==speechRequestId)return;clearTimeout(speechStartTimer);updateSpeechButtons(activeSpeechText,status);activeUtterance=null;if(status==="idle")activeSpeechText=""}
-function speakWord(text){
-  if(!("speechSynthesis" in window)||!("SpeechSynthesisUtterance" in window)){showToast("当前浏览器不支持语音播放，请换用 Safari、Chrome 或 Edge");return}
-  const synth=window.speechSynthesis,now=Date.now();
-  if(activeSpeechText===text&&synth.speaking&&now-lastSpeechClick<900){lastSpeechClick=now;if(synth.paused)synth.resume();updateSpeechButtons(text,"speaking");return}
-  lastSpeechClick=now;const requestId=++speechRequestId;clearTimeout(speechStartTimer);if(activeSpeechText)updateSpeechButtons(activeSpeechText,"idle");activeSpeechText=text;updateSpeechButtons(text,"pending");synth.cancel();
-  const begin=attempt=>{
-    if(requestId!==speechRequestId)return;
-    let started=false;const utterance=new SpeechSynthesisUtterance(text),voice=preferredEnglishVoice(attempt);activeUtterance=utterance;utterance.lang="en-US";utterance.rate=.82;utterance.pitch=1;utterance.volume=1;if(voice)utterance.voice=voice;
-    utterance.onstart=()=>{if(requestId!==speechRequestId)return;started=true;clearTimeout(speechStartTimer);updateSpeechButtons(text,"speaking")};
-    utterance.onend=()=>finishSpeech(requestId);
-    utterance.onerror=event=>{if(requestId!==speechRequestId||["canceled","interrupted"].includes(event.error))return;clearTimeout(speechStartTimer);if(!attempt){synth.cancel();setTimeout(()=>begin(1),180)}else{finishSpeech(requestId,"error");showToast("发音没有播放，请检查设备媒体音量后重试")}};
-    try{if(synth.paused)synth.resume();synth.speak(utterance)}catch{if(!attempt)setTimeout(()=>begin(1),180);else{finishSpeech(requestId,"error");showToast("发音启动失败，请刷新页面后重试")}return}
-    speechStartTimer=setTimeout(()=>{if(requestId!==speechRequestId||started)return;if(synth.speaking){started=true;updateSpeechButtons(text,"speaking");return}synth.cancel();if(!attempt)setTimeout(()=>begin(1),220);else{finishSpeech(requestId,"error");showToast("系统语音暂时不可用，请刷新页面后重试")}},7500);
-  };
-  begin(0);
+function stopActiveSpeech(){clearTimeout(speechStartTimer);if(activeAudio){activeAudio.onplay=activeAudio.onended=activeAudio.onerror=null;activeAudio.pause();activeAudio.removeAttribute("src");activeAudio.load();activeAudio=null}if("speechSynthesis" in window)window.speechSynthesis.cancel();activeUtterance=null;speechSourceMode="idle"}
+function finishSpeech(requestId,status="idle"){if(requestId!==speechRequestId)return;clearTimeout(speechStartTimer);updateSpeechButtons(activeSpeechText,status);activeUtterance=null;activeAudio=null;speechSourceMode=status;if(status==="idle")activeSpeechText=""}
+function playOnlinePronunciation(text,requestId,provider=0){
+  if(requestId!==speechRequestId)return;const urls=pronunciationUrls(text);
+  if(provider>=urls.length){finishSpeech(requestId,"error");showToast(navigator.onLine?"英文发音暂时不可用，请稍后重试":"当前离线，且电脑未安装英文语音");return}
+  clearTimeout(speechStartTimer);let started=false,finished=false;const audio=new Audio(urls[provider]),tryNext=()=>{if(finished||requestId!==speechRequestId)return;finished=true;clearTimeout(speechStartTimer);audio.pause();if(activeAudio===audio)activeAudio=null;setTimeout(()=>playOnlinePronunciation(text,requestId,provider+1),80)};
+  activeAudio=audio;speechSourceMode=`online-${provider+1}`;audio.preload="auto";audio.volume=1;audio.playbackRate=.92;
+  audio.onplay=()=>{if(requestId!==speechRequestId)return;started=true;clearTimeout(speechStartTimer);updateSpeechButtons(text,"speaking")};
+  audio.onended=()=>{finished=true;finishSpeech(requestId)};audio.onerror=tryNext;
+  audio.play().catch(tryNext);speechStartTimer=setTimeout(()=>{if(!started)tryNext()},5000);
+}
+function beginSystemSpeech(text,requestId,attempt=0){
+  if(requestId!==speechRequestId)return;const plan=speechVoicePlan(),synth=window.speechSynthesis;
+  if(attempt>=plan.length){playOnlinePronunciation(text,requestId);return}
+  clearTimeout(speechStartTimer);let started=false;const utterance=new SpeechSynthesisUtterance(text),voice=preferredEnglishVoice(attempt);activeUtterance=utterance;speechSourceMode="system";utterance.lang=voice?.lang||"en-US";utterance.rate=.82;utterance.pitch=1;utterance.volume=1;utterance.voice=voice;
+  utterance.onstart=()=>{if(requestId!==speechRequestId)return;started=true;clearTimeout(speechStartTimer);updateSpeechButtons(text,"speaking")};
+  utterance.onend=()=>finishSpeech(requestId);
+  utterance.onerror=event=>{if(requestId!==speechRequestId||["canceled","interrupted"].includes(event.error))return;clearTimeout(speechStartTimer);synth.cancel();setTimeout(()=>beginSystemSpeech(text,requestId,attempt+1),120)};
+  try{if(synth.paused)synth.resume();synth.speak(utterance)}catch{synth.cancel();setTimeout(()=>beginSystemSpeech(text,requestId,attempt+1),120);return}
+  speechStartTimer=setTimeout(()=>{if(requestId!==speechRequestId||started)return;synth.cancel();beginSystemSpeech(text,requestId,attempt+1)},3500);
+}
+async function speakWord(text){
+  if(!text)return;const requestId=++speechRequestId;if(activeSpeechText)updateSpeechButtons(activeSpeechText,"idle");stopActiveSpeech();activeSpeechText=text;updateSpeechButtons(text,"pending");
+  await waitForEnglishVoices();if(requestId!==speechRequestId)return;
+  if("speechSynthesis" in window&&"SpeechSynthesisUtterance" in window&&speechVoicePlan().length){setTimeout(()=>beginSystemSpeech(text,requestId),70)}else{playOnlinePronunciation(text,requestId)}
 }
 if("speechSynthesis" in window){refreshEnglishVoices();window.speechSynthesis.addEventListener?.("voiceschanged",refreshEnglishVoices)}
 
@@ -491,7 +503,7 @@ document.addEventListener("keydown",e=>{if(e.key!=="Enter"||e.repeat||!session||
 document.addEventListener("keydown",e=>{if(e.key!=="Escape")return;if(document.querySelector("#auth-modal").classList.contains("active"))setModalOpen("#auth-modal",false);else if(document.querySelector("#settings-modal").classList.contains("active"))setModalOpen("#settings-modal",false)});
 document.querySelector("#settings-modal").addEventListener("click",e=>{if(e.target.id==="settings-modal")setModalOpen("#settings-modal",false)});
 document.querySelector("#auth-modal").addEventListener("click",e=>{if(e.target.id==="auth-modal")setModalOpen("#auth-modal",false)});
-document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){refreshEnglishVoices();if(authSession)syncProgress();checkForAppUpdate()}else if("speechSynthesis" in window){window.speechSynthesis.cancel();finishSpeech(speechRequestId)}});
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){refreshEnglishVoices();if(authSession)syncProgress();checkForAppUpdate()}else{stopActiveSpeech();finishSpeech(speechRequestId)}});
 window.addEventListener("online",()=>{if(authSession)syncProgress()});
 
 verifyContentBundle().then(valid=>{if(valid){renderDashboard();renderLibrary();renderProgress();initAuth();checkForAppUpdate()}});

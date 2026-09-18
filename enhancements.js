@@ -317,4 +317,4 @@ syncProgress=async(notify=false)=>{
 
 document.addEventListener("keydown",event=>{if(event.key==="Escape"&&document.querySelector("#placement-modal").classList.contains("active"))setModalOpen("#placement-modal",false)});
 ensurePlacementCompletion();populateEnhancedSettings();renderDashboard();renderLibrary();renderProgress();consumeRecoveryLink();setTimeout(()=>{if(!ensurePlacementCompletion())openPlacement(true)},700);
-window.WordStepEnhancements={version:"20260913-1",retrievability,nextSchedule,openPlacement,exportProgress,migrateLegacyMemoryState,vocabularyLevel,ensurePlacementCompletion};
+window.WordStepEnhancements={version:"20260918-1",retrievability,nextSchedule,openPlacement,exportProgress,migrateLegacyMemoryState,vocabularyLevel,ensurePlacementCompletion};

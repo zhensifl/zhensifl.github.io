@@ -1,5 +1,5 @@
-const CACHE_NAME="wordstep-20260913-1";
-const SHELL=["./","./index.html","./styles.css","./app-20260913-1.js","./enhancements-20260913-1.js","./sync-model-20260913-1.js","./manifest.webmanifest","./icon.svg","./icon-32.png","./icon-192.png","./icon-512.png","./icon-maskable-512.png","./apple-touch-icon.png","./version.json"];
+const CACHE_NAME="wordstep-20260918-1";
+const SHELL=["./","./index.html","./styles.css","./app-20260918-1.js","./enhancements-20260918-1.js","./sync-model-20260918-1.js","./manifest.webmanifest","./icon.svg","./icon-32.png","./icon-192.png","./icon-512.png","./icon-maskable-512.png","./apple-touch-icon.png","./version.json"];
 const DATA=["./compact-words-20260913-1.js"];
 const NAVIGATION_TIMEOUT=2200;
 self.addEventListener("install",event=>event.waitUntil(caches.open(CACHE_NAME).then(async cache=>{
