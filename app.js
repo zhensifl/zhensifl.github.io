@@ -150,7 +150,7 @@ const WORDS = ALL_WORDS.filter(word=>{const key=word.en.toLowerCase();if(vocabul
 
 const STORAGE_KEY = "wordstep-state-v1";
 const AUTH_STORAGE_KEY = "wordstep-auth-v1";
-const APP_VERSION = "20260918-1";
+const APP_VERSION = "20261004-1";
 const SUPABASE_URL = "https://wgvxdzwrvgktcidmofit.supabase.co";
 const SUPABASE_KEY = "sb_publishable_O2PaZM-nTJKAaeUYKiXbBw_r4WmllMx";
 const DAY = 86400000;
@@ -405,7 +405,7 @@ async function checkForAppUpdate(){
 
 async function verifyContentBundle(){
   const compactVersion=window.WORDSTEP_COMPACT_INFO?.version;
-  if(WORDS.length===5097&&compactVersion==="20260913-1")return true;
+  if(WORDS.length===5097&&compactVersion==="20261004-1")return true;
   if(!navigator.onLine)return false;
   const recoveryKey=`wordstep-bundle-repair-${APP_VERSION}`;
   if(sessionStorage.getItem(recoveryKey))return false;

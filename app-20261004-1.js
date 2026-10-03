@@ -1,0 +1,509 @@
+const CURATED_WORDS = [
+  // 居家生活
+  ["morning","早晨","Good morning! Did you sleep well?","早上好！你睡得好吗？","居家生活","/ˈmɔːrnɪŋ/"],
+  ["breakfast","早餐","I usually have breakfast at seven.","我通常七点吃早餐。","居家生活","/ˈbrekfəst/"],
+  ["kitchen","厨房","The cups are in the kitchen.","杯子在厨房里。","居家生活","/ˈkɪtʃɪn/"],
+  ["clean","打扫；干净的","I need to clean the room.","我需要打扫房间。","居家生活","/kliːn/"],
+  ["laundry","待洗衣物；洗衣服","I do the laundry on Sunday.","我星期日洗衣服。","居家生活","/ˈlɔːndri/"],
+  ["neighbor","邻居","Our new neighbor is very friendly.","我们的新邻居很友好。","居家生活","/ˈneɪbər/"],
+  ["comfortable","舒服的","This chair is very comfortable.","这把椅子很舒服。","居家生活","/ˈkʌmftəbl/"],
+  ["prepare","准备","I need to prepare dinner.","我需要准备晚餐。","居家生活","/prɪˈper/"],
+  ["repair","修理","Can you repair the door?","你能修一下门吗？","居家生活","/rɪˈper/"],
+  ["quiet","安静的","It is quiet here at night.","这里晚上很安静。","居家生活","/ˈkwaɪət/"],
+  ["towel","毛巾","Could you bring me a towel?","你能给我拿条毛巾吗？","居家生活","/ˈtaʊəl/"],
+  ["blanket","毯子","The blanket is warm and soft.","这条毯子温暖又柔软。","居家生活","/ˈblæŋkɪt/"],
+  // 饮食购物
+  ["order","点餐；订购","Are you ready to order?","您准备好点餐了吗？","饮食购物","/ˈɔːrdər/"],
+  ["menu","菜单","Could I see the menu, please?","请给我看一下菜单好吗？","饮食购物","/ˈmenjuː/"],
+  ["delicious","美味的","The soup is delicious.","这汤很美味。","饮食购物","/dɪˈlɪʃəs/"],
+  ["hungry","饿的","I'm hungry. Let's get some food.","我饿了。我们去吃点东西吧。","饮食购物","/ˈhʌŋɡri/"],
+  ["bill","账单","Could we have the bill, please?","请把账单给我们好吗？","饮食购物","/bɪl/"],
+  ["cash","现金","Can I pay in cash?","我能用现金支付吗？","饮食购物","/kæʃ/"],
+  ["price","价格","What is the price of this shirt?","这件衬衫多少钱？","饮食购物","/praɪs/"],
+  ["cheap","便宜的","This store is quite cheap.","这家店很便宜。","饮食购物","/tʃiːp/"],
+  ["expensive","昂贵的","That restaurant is too expensive.","那家餐厅太贵了。","饮食购物","/ɪkˈspensɪv/"],
+  ["receipt","收据","Please keep your receipt.","请保留您的收据。","饮食购物","/rɪˈsiːt/"],
+  ["change","零钱；改变","Keep the change.","不用找零了。","饮食购物","/tʃeɪndʒ/"],
+  ["available","有货的；可用的","Is this size available?","这个尺码有货吗？","饮食购物","/əˈveɪləbl/"],
+  // 出行问路
+  ["station","车站","How far is the train station?","火车站有多远？","出行问路","/ˈsteɪʃn/"],
+  ["ticket","票","I need a ticket to Shanghai.","我需要一张去上海的票。","出行问路","/ˈtɪkɪt/"],
+  ["direction","方向；路线","Could you give me directions?","你能给我指路吗？","出行问路","/dəˈrekʃn/"],
+  ["straight","直的；径直","Go straight for two blocks.","直走两个街区。","出行问路","/streɪt/"],
+  ["corner","拐角","Turn left at the corner.","在拐角处左转。","出行问路","/ˈkɔːrnər/"],
+  ["traffic","交通","There is a lot of traffic today.","今天交通很拥堵。","出行问路","/ˈtræfɪk/"],
+  ["arrive","到达","What time will we arrive?","我们几点到？","出行问路","/əˈraɪv/"],
+  ["leave","离开","I have to leave now.","我现在得走了。","出行问路","/liːv/"],
+  ["nearby","附近的","Is there a bank nearby?","附近有银行吗？","出行问路","/ˌnɪrˈbaɪ/"],
+  ["entrance","入口","The entrance is on your right.","入口在你的右边。","出行问路","/ˈentrəns/"],
+  ["delay","延误","The flight has a short delay.","航班短暂延误。","出行问路","/dɪˈleɪ/"],
+  ["platform","站台","The train leaves from platform six.","火车从六号站台发车。","出行问路","/ˈplætfɔːrm/"],
+  // 社交沟通
+  ["introduce","介绍","Let me introduce myself.","让我自我介绍一下。","社交沟通","/ˌɪntrəˈduːs/"],
+  ["hobby","爱好","What do you do as a hobby?","你有什么爱好？","社交沟通","/ˈhɑːbi/"],
+  ["weekend","周末","What are you doing this weekend?","你这周末做什么？","社交沟通","/ˌwiːkˈend/"],
+  ["invite","邀请","I'd like to invite you to dinner.","我想邀请你吃晚饭。","社交沟通","/ɪnˈvaɪt/"],
+  ["agree","同意","I agree with you.","我同意你的看法。","社交沟通","/əˈɡriː/"],
+  ["probably","大概；可能","I'll probably stay at home.","我可能会待在家里。","社交沟通","/ˈprɑːbəbli/"],
+  ["interesting","有趣的","That sounds interesting.","那听起来很有趣。","社交沟通","/ˈɪntrəstɪŋ/"],
+  ["together","一起","Let's have lunch together.","我们一起吃午饭吧。","社交沟通","/təˈɡeðər/"],
+  ["message","消息","I'll send you a message.","我会给你发消息。","社交沟通","/ˈmesɪdʒ/"],
+  ["remember","记得","Do you remember his name?","你记得他的名字吗？","社交沟通","/rɪˈmembər/"],
+  ["understand","理解","Sorry, I don't understand.","抱歉，我没听懂。","社交沟通","/ˌʌndərˈstænd/"],
+  ["explain","解释","Could you explain that again?","你能再解释一下吗？","社交沟通","/ɪkˈspleɪn/"],
+  // 办公沟通
+  ["meeting","会议","We have a meeting at ten.","我们十点有个会。","办公沟通","/ˈmiːtɪŋ/"],
+  ["schedule","日程；安排","Let me check my schedule.","让我看一下日程。","办公沟通","/ˈskedʒuːl/"],
+  ["project","项目","The project is going well.","项目进展顺利。","办公沟通","/ˈprɑːdʒekt/"],
+  ["deadline","截止日期","The deadline is next Friday.","截止日期是下周五。","办公沟通","/ˈdedlaɪn/"],
+  ["report","报告；汇报","I'll send the report today.","我今天会发送报告。","办公沟通","/rɪˈpɔːrt/"],
+  ["task","任务","I finished the task this morning.","我今天早上完成了任务。","办公沟通","/tæsk/"],
+  ["update","更新；最新消息","Can you give me an update?","你能告诉我最新进展吗？","办公沟通","/ˈʌpdeɪt/"],
+  ["discuss","讨论","Let's discuss this tomorrow.","我们明天讨论这个吧。","办公沟通","/dɪˈskʌs/"],
+  ["suggest","建议","I suggest a different plan.","我建议换一个方案。","办公沟通","/səˈdʒest/"],
+  ["confirm","确认","Please confirm the meeting time.","请确认会议时间。","办公沟通","/kənˈfɜːrm/"],
+  ["forward","转发；向前","Could you forward the email?","你能转发这封邮件吗？","办公沟通","/ˈfɔːrwərd/"],
+  ["attach","附上；连接","I've attached the document.","我已附上文件。","办公沟通","/əˈtætʃ/"],
+  // 协作反馈
+  ["progress","进展","We are making good progress.","我们进展得很好。","协作反馈","/ˈprɑːɡres/"],
+  ["problem","问题","We need to solve this problem.","我们需要解决这个问题。","协作反馈","/ˈprɑːbləm/"],
+  ["solution","解决方案","Do you have a solution?","你有解决方案吗？","协作反馈","/səˈluːʃn/"],
+  ["support","支持","Thank you for your support.","谢谢你的支持。","协作反馈","/səˈpɔːrt/"],
+  ["improve","改进","How can we improve this?","我们怎样改进这个？","协作反馈","/ɪmˈpruːv/"],
+  ["feedback","反馈","I'd like to hear your feedback.","我想听听你的反馈。","协作反馈","/ˈfiːdbæk/"],
+  ["responsible","负责的","Who is responsible for this task?","谁负责这项任务？","协作反馈","/rɪˈspɑːnsəbl/"],
+  ["priority","优先事项","This is our top priority.","这是我们的首要任务。","协作反馈","/praɪˈɔːrəti/"],
+  ["complete","完成；完整的","We need to complete it today.","我们需要今天完成它。","协作反馈","/kəmˈpliːt/"],
+  ["expect","预期；期待","What result do you expect?","你预期什么结果？","协作反馈","/ɪkˈspekt/"],
+  ["decision","决定","We need to make a decision.","我们需要做决定。","协作反馈","/dɪˈsɪʒn/"],
+  ["opportunity","机会","This is a great opportunity.","这是一个很好的机会。","协作反馈","/ˌɑːpərˈtuːnəti/"],
+].map(w=>({en:w[0],zh:w[1],example:w[2],exampleZh:w[3],category:w[4],phonetic:w[5]}));
+
+const CURATED_POS = {
+  morning:"n.",breakfast:"n.",kitchen:"n.",clean:"v./adj.",laundry:"n.",neighbor:"n.",comfortable:"adj.",prepare:"v.",repair:"v.",quiet:"adj.",towel:"n.",blanket:"n.",
+  order:"n./v.",menu:"n.",delicious:"adj.",hungry:"adj.",bill:"n.",cash:"n.",price:"n.",cheap:"adj.",expensive:"adj.",receipt:"n.",change:"n./v.",available:"adj.",
+  station:"n.",ticket:"n.",direction:"n.",straight:"adj./adv.",corner:"n.",traffic:"n.",arrive:"v.",leave:"v.",nearby:"adj./adv.",entrance:"n.",delay:"n./v.",platform:"n.",
+  introduce:"v.",invite:"v.",message:"n./v.",together:"adv.",interesting:"adj.",hobby:"n.",weekend:"n.",remember:"v.",understand:"v.",probably:"adv.",agree:"v.",suggest:"v.",
+  meeting:"n.",schedule:"n./v.",deadline:"n.",project:"n.",task:"n.",report:"n./v.",update:"n./v.",explain:"v.",discuss:"v.",confirm:"v.",forward:"v./adv.",attach:"v.",
+  progress:"n.",problem:"n.",solution:"n.",support:"n./v.",improve:"v.",feedback:"n.",responsible:"adj.",priority:"n.",complete:"v./adj.",expect:"v.",decision:"n.",opportunity:"n."
+};
+const TOO_BASIC_WORDS = new Set(`
+  the a an this that these those i me my mine you your yours he him his she her hers it its we us our ours they them their theirs
+  who whom whose what which am is are was were be been being have has had having do does did done doing
+  can could may might must shall should will would and or but if because so as than though although while whether
+  to of in on at for from by with about into onto over under above below after before between through during without within against among around
+  not no yes all any some each every either neither both another other one two three four five six seven eight nine ten
+  here there now then very too only just also up down out off more most much many few little
+  myself yourself himself herself itself ourselves themselves whoever whatever maybe
+  car cat dog man woman boy girl child children mother father mom dad brother sister book pen pencil table chair door window room house home school
+  red blue green black white big small good bad new old hot cold day night week month year water food milk tea name
+  go come get give take make say tell see look know think want like love eat drink sleep sit stand walk run read write
+  when time people how first way where even really right why still never life world great last best such long something same
+  part always better find high since own thing place again next end show feel sure ever keep please put free second someone
+  away left number lot play until let real different set already anything nothing person today enough everything full live
+  point yet hard mean once stop believe head far side try actually later less line open thank everyone whole face kind hope
+  able early young ago half hand mind often single body guy true almost
+  back well need work use help game team family money city company group top care start music call job party service area
+  story course health important news information local video social talk fact level office pay large several win wrong along
+  anyone else matter pretty air bit friend hit nice class close idea past possible cause due happy human move question wait ask
+  late special watch future light low short stay age buy deal reason soon turn check form heart act fire fun phone art behind
+  easy near plan quite final front list ready sometimes son street bring example experience meet type baby chance song study
+  word clear outside self board cost cut field main moment road per oh non
+  town hear rest wife beautiful date land miss strong hour sorry answer learn alone bank movie park cool sound usually save
+  stuff drive fall fast picture size step hey key page cup football hate
+  river tree mountain lake ocean beach sea forest garden flower grass sky sun moon star earth rain snow wind weather island
+  animal bird fish horse cow pig sheep chicken duck rabbit mouse monkey lion tiger bear
+  eye ear nose mouth tooth teeth neck arm leg foot feet finger shirt shoe hat coat dress pants sock apple banana orange egg
+  spring summer autumn fall winter doctor hospital teacher student
+  zero eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty thirty forty fifty sixty seventy
+  eighty ninety hundred thousand million billion aircraft truck bowl meat cream salt smile giant tiny wave bright wing bell
+  boyfriend cry dollar empty mile flag guest kiss load scared stream
+  taylor tony bob don nick pacific kinda split escape fault fill friendly pure secure strange talent temperature blame false
+  obvious slowly vision usual upset hang row blow careful danger branch favor frame sentence bottle bunch chat cheese detail
+  diet favourite fruit item lane mess parent pleasure shift tank tight
+  yard anybody basketball button golf tool turkey amazon circle dirty joy noise plate rice roof tip baseball bathroom cable
+  calm hide sight sing wet bike cake loud motor peak sample battery blind breath chest paint pilot pink singer steam tall cap
+  fee lock plastic tie bread lift shoulder shower tower wheel bush chocolate coal colour gallery highway inch smell speaker tone
+  topic grey gray guitar meal pocket soccer bone clothing gap gate gotten lesson mirror thin adventure awful bedroom cloud gear
+  hip package railway wash acid castle flash fort math mystery palace pet silent trail uncle bath chase horrible matt hong sydney
+  dan jordan ford miller zealand eric kong santa toronto lewis mac
+  jimmy dallas walker dean sand shadow tape clock desk gym pizza belt diamond ghost hockey lab soil stomach trash cousin dust
+  illness knife telephone butter crystal desert mum boring helpful anger nervous ordinary ugly rarely
+  morning breakfast kitchen clean quiet hungry cheap price cash hobby weekend together interesting remember
+  mr mrs ms god john james david michael robert mary york london america american british england english china chinese japan
+  january february march april june july august september october november december monday tuesday wednesday thursday friday saturday sunday
+  north south east west x l tv re gonna wanna yeah okay ok
+`.trim().split(/\s+/));
+const EXCLUDED_WORDS = new Set("murder suicide kill killed killing killer gun shot shooting attack bomb combat arrest victim weapon gang assault rape war death dead blood violent violence soldier sex sexy sexual porn naked racist suck crap bullshit church catholic bible temple prayer angel king queen god hell heaven lord damn french european united".split(" "));
+const MIN_GENERATED_RANK = 2200;
+const DICTIONARY_BY_EN = new Map((window.WORD_DATA||[]).map(word=>[word.en.toLowerCase(),word]));
+const ESSENTIAL_BY_EN=new Map((window.WORDSTEP_ESSENTIAL_WORDS||[]).map(word=>[word.en.toLowerCase(),word]));
+const COMPACT_VOCABULARY=window.WORDSTEP_COMPACT_WORDS===true;
+const WORD_SOURCE=COMPACT_VOCABULARY?(window.WORD_DATA||[]):[...CURATED_WORDS,...(window.WORD_DATA||[])];
+const BASE_WORDS = WORD_SOURCE.map((word,index)=>{const essential=ESSENTIAL_BY_EN.get(word.en.toLowerCase()),merged=essential?{...word,...essential}:word;return {...merged,pos:partOfSpeech(merged),id:COMPACT_VOCABULARY?Number(merged.id):index+1,isCurated:COMPACT_VOCABULARY?!!merged.isCurated:index<CURATED_WORDS.length||!!essential,isEssential:COMPACT_VOCABULARY?!!merged.isEssential:!!essential}});
+const BASE_WORD_KEYS=new Set(BASE_WORDS.map(word=>word.en.toLowerCase()));
+const NEXT_AVAILABLE_WORD_ID=Math.max(0,...BASE_WORDS.map(word=>Number(word.id)||0))+1;
+const ALL_WORDS = [...BASE_WORDS,...(window.WORDSTEP_ESSENTIAL_WORDS||[]).filter(word=>!BASE_WORD_KEYS.has(word.en.toLowerCase())).map((word,index)=>({...word,pos:partOfSpeech(word),id:NEXT_AVAILABLE_WORD_ID+index,isCurated:true,isEssential:true}))];
+function isUsefulVocabulary(word){return COMPACT_VOCABULARY||word.senseVersion==="20260903-1"&&word.qualityReady===true&&window.WORDSTEP_FOCUSED_WORDS?.has(word.en.toLowerCase())&&word.en.length>=3&&Number(word.frequencyRank||Infinity)>=MIN_GENERATED_RANK&&!word.base&&!word.proper&&!EXCLUDED_WORDS.has(word.en.toLowerCase())&&!/(?:男子名|女子名|人名|城市名|州名|国家名|国名|首都)/.test(word.zh)}
+const vocabularySeen=new Set();
+const WORDS = ALL_WORDS.filter(word=>{const key=word.en.toLowerCase();if(vocabularySeen.has(key))return false;if((TOO_BASIC_WORDS.has(key)&&!word.isEssential)||(!word.isCurated&&!isUsefulVocabulary(word)))return false;vocabularySeen.add(key);return true}).sort((a,b)=>(a.isDailyCore?-3:a.isEssential?-2:a.isCurated?-1:(window.WORDSTEP_FOCUS_PRIORITY?.[a.en]??3))-(b.isDailyCore?-3:b.isEssential?-2:b.isCurated?-1:(window.WORDSTEP_FOCUS_PRIORITY?.[b.en]??3))||(Number(a.frequencyRank)||Infinity)-(Number(b.frequencyRank)||Infinity));
+
+const STORAGE_KEY = "wordstep-state-v1";
+const AUTH_STORAGE_KEY = "wordstep-auth-v1";
+const APP_VERSION = "20261004-1";
+const SUPABASE_URL = "https://wgvxdzwrvgktcidmofit.supabase.co";
+const SUPABASE_KEY = "sb_publishable_O2PaZM-nTJKAaeUYKiXbBw_r4WmllMx";
+const DAY = 86400000;
+const STAGE_DAYS = [1,2,4,7,15,30,60];
+const categoryNames = [...new Set(WORDS.map(w=>w.category))];
+const defaultState = {dailyGoal:10, words:{}, activity:{}, lastStudyDate:null, updatedAt:0};
+let authSession = loadAuthSession();
+let state = loadInitialState();
+let activeCategory = "全部";
+let libraryLimit = 100;
+let session = null;
+let authMode = "login";
+let syncTimer = null;
+let syncBusy = false;
+let syncQueued = false;
+let replaceCloudOnNextSync = false;
+let syncStatus = "未登录 · 进度仅保存在当前设备";
+let authMessage = "";
+let storageWarningShown = false;
+
+function localDate(d=new Date()){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0");return `${y}-${m}-${day}`}
+function dayStart(d=new Date()){return new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime()}
+function extractPartOfSpeech(meaning=""){const found=[...meaning.matchAll(/(?:^|；)\s*(art|aux|conj|interj|num|prep|pron|adv|adj|a|vt|vi|v|n|pl)\./gi)].map(match=>({a:"adj",vt:"v",vi:"v",pl:"n"}[match[1].toLowerCase()]||match[1].toLowerCase()));return [...new Set(found)].map(pos=>`${pos}.`).join("/")}
+function inferredPartOfSpeech(word){const en=word.en.toLowerCase();if(["the","a","an"].includes(en))return "art.";if(["i","you","he","she","it","we","they","me","him","her","us","them","this","that","these","those","who","what","which"].includes(en))return "pron.";if(["and","or","but","if","because","when","while","although"].includes(en))return "conj.";if(["in","on","at","to","for","from","with","by","about","into","over","after","before"].includes(en))return "prep.";if(["can","could","may","might","must","should","would","will"].includes(en))return "aux.";if(en.endsWith("ly"))return "adv.";if(/(tion|sion|ment|ness|ity|ship|ance|ence|er|or)$/.test(en))return "n.";if(/(ous|ful|less|able|ible|ive|al|ic|ish|ary)$/.test(en)||/的(?:；|$)/.test(word.zh))return "adj.";return "v."}
+function partOfSpeech(word){return CURATED_POS[word.en.toLowerCase()]||extractPartOfSpeech(word.zh)||extractPartOfSpeech(DICTIONARY_BY_EN.get(word.en.toLowerCase())?.zh)||inferredPartOfSpeech(word)}
+function cleanMeaning(meaning=""){return meaning.replace(/(^|；)\s*(?:art|aux|conj|interj|num|prep|pron|adv|adj|a|vt|vi|v|n|pl)\.\s*/gi,"$1").trim()}
+function conciseMeaning(meaning=""){const parts=cleanMeaning(meaning).replace(/\r?\n/g," ").replace(/\[[^\]]*\]/g,"").split(/[；;]/).filter(Boolean).slice(0,2).map(part=>part.split(/[,，]/).filter(Boolean).slice(0,2).join("、"));const result=parts.join("；");return result.length>36?`${result.slice(0,35)}…`:result}
+function primaryMeaning(word){const value=cleanMeaning(word.zh).replace(/\r?\n/g," ").replace(/\[[^\]]*\]/g,"").split(/[；;,，]/).map(part=>part.trim()).find(Boolean)||word.category;return value.length>18?`${value.slice(0,17)}…`:value}
+function meaningWithPartOfSpeech(word){return `${word.pos} ${conciseMeaning(word.zh)}`}
+function phraseWithBlank(word){
+  if(!word.phrase)return "";
+  const escape=value=>value.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"),en=word.en.toLowerCase();
+  const forms=new Set([en,en+"s",en+"es",en+"ed",en+"ing"]);
+  if(en.endsWith("e")){forms.add(en+"d");forms.add(en.slice(0,-1)+"ing")}
+  if(en.endsWith("y")){forms.add(en.slice(0,-1)+"ies");forms.add(en.slice(0,-1)+"ied")}
+  const pattern=new RegExp("\\b(?:"+[...forms].map(escape).sort((a,b)=>b.length-a.length).join("|")+")\\b","gi");
+  let result=word.phrase.replace(pattern,"______");
+  if(result===word.phrase&&en==="backup")result=result.replace(/\bback up\b/i,"______");
+  return result;
+}
+function phraseHintHtml(word,masked=false){if(!word.phrase)return "";return `<div class="phrase-hint ${masked?"masked":""}"><span>实用表达</span><strong>${escapeAttr(masked?phraseWithBlank(word):word.phrase)}</strong><small>${escapeAttr(word.phraseZh||"")}</small></div>`}
+function capitalize(value=""){return value.charAt(0).toUpperCase()+value.slice(1)}
+const IRREGULAR_FORMS=new Set(["taken","given","written","spoken","broken","chosen","driven","eaten","fallen","forgotten","frozen","grown","known","shown","thrown","worn","said","made","built","bought","brought","caught","found","thought","sent","left","lost","kept","felt","held","paid","sold","told","won","done","gone","seen","been"]);
+function exampleFor(word){
+  if(word.example&&word.exampleZh)return {en:word.example,zh:word.exampleZh,kind:word.exampleType==="definition"?"definition":"sentence"};
+  const en=word.en,meaning=primaryMeaning(word),pos=word.pos||"";let sentence,translation;
+  if(pos.includes("num.")){sentence=`The report included “${en}” as an important number.`;translation=`报告把“${meaning}”列为一个重要数字。`}
+  else if(pos.includes("n.")){sentence=`We talked about the ${en} during the meeting.`;translation=`我们在会议中讨论了“${meaning}”。`}
+  else if(pos.includes("adj.")){sentence=`The situation seems ${en} to everyone.`;translation=`对大家来说，这种情况似乎“${meaning}”。`}
+  else if(pos.includes("adv.")){
+    if(en.endsWith("ly")){sentence=`She handled the situation ${en}.`;translation=`她“${meaning}”地处理了这种情况。`}
+    else{sentence=`We discussed when to use “${en}”.`;translation=`我们讨论了什么时候使用“${en}（${meaning}）”。`}
+  }
+  else if(pos.includes("v.")){
+    if(en.endsWith("ing")){sentence=`${capitalize(en)} requires time and careful attention.`;translation=`“${meaning}”需要时间和认真投入。`}
+    else if(en.endsWith("ed")){sentence=`The team ${en} the issue during the meeting.`;translation=`团队在会议中“${meaning}”了这个问题。`}
+    else if(IRREGULAR_FORMS.has(en)){sentence=`We reviewed how “${en}” is used in this sentence.`;translation=`我们复习了“${en}（${meaning}）”在这个句子中的用法。`}
+    else if(en.endsWith("s")&&!en.endsWith("ss")){sentence=`She ${en} this task every day.`;translation=`她每天都“${meaning}”这项任务。`}
+    else{sentence=`We need to ${en} this before tomorrow.`;translation=`我们需要在明天之前“${meaning}”这件事。`}
+  }else{sentence=`We discussed “${en}” in today's conversation.`;translation=`我们在今天的对话中讨论了“${en}（${meaning}）”。`}
+  return {en:sentence,zh:translation};
+}
+function clozeExample(word){
+  const example=exampleFor(word),en=word.en.toLowerCase(),forms=new Set([en,...(word.forms||[]),en+"s",en+"es",en+"ed",en+"ing"]);
+  const irregular={misunderstand:["misunderstood"],withdraw:["withdrew","withdrawn"]};
+  (irregular[en]||[]).forEach(form=>forms.add(form));
+  if(en.endsWith("e")){forms.add(en+"d");forms.add(en.slice(0,-1)+"ing")}
+  if(en.endsWith("y")){forms.add(en.slice(0,-1)+"ies");forms.add(en.slice(0,-1)+"ied")}
+  if(/[aeiou][bcdfghjklmnpqrstvwxyz]$/.test(en)){forms.add(en+en.slice(-1)+"ed");forms.add(en+en.slice(-1)+"ing")}
+  const escape=value=>value.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+  const pattern=new RegExp("\\b(?:"+[...forms].map(escape).sort((a,b)=>b.length-a.length).join("|")+")\\b","gi");
+  return {...example,en:example.en.replace(pattern,"______"),zh:example.zh.replace(pattern,"______")};
+}
+function progressStorageKey(auth=authSession){return auth?.user?.id?`${STORAGE_KEY}:user:${auth.user.id}`:STORAGE_KEY}
+function loadState(key=progressStorageKey()){try{return {...defaultState,...JSON.parse(localStorage.getItem(key)||"{}")}}catch{return structuredClone(defaultState)}}
+function loadInitialState(){
+  if(!authSession?.user)return loadState(STORAGE_KEY);
+  const key=progressStorageKey(authSession);
+  try{
+    if(localStorage.getItem(key)!==null)return loadState(key);
+    const migrated=loadState(STORAGE_KEY);localStorage.setItem(key,JSON.stringify(migrated));localStorage.setItem(STORAGE_KEY,JSON.stringify(defaultState));return migrated;
+  }catch{return loadState(key)}
+}
+function persistLocalState(){try{localStorage.setItem(progressStorageKey(),JSON.stringify(state));storageWarningShown=false;return true}catch(error){console.error("Local progress save failed",error);if(!storageWarningShown){storageWarningShown=true;showToast(authSession?"本机缓存写入失败，正在继续同步到云端":"本机存储空间不足，请登录后同步进度")}return false}}
+function saveState({replaceCloud=false}={}){state.updatedAt=Date.now();persistLocalState();if(replaceCloud)replaceCloudOnNextSync=true;scheduleCloudSync()}
+function loadAuthSession(){try{return JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY)||"null")}catch{return null}}
+let authEpoch=0;
+function setAuthSession(next){if(authSession?.user?.id!==next?.user?.id){authEpoch++;clearTimeout(syncTimer);syncQueued=false;replaceCloudOnNextSync=false;if(session)closeSession()}authSession=next;try{if(next)localStorage.setItem(AUTH_STORAGE_KEY,JSON.stringify(next));else localStorage.removeItem(AUTH_STORAGE_KEY)}catch(error){console.error("Auth session cache failed",error);showToast("登录状态无法写入本机缓存，本次仍可继续使用")}renderAccountUI()}
+function clearAnonymousProgress(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(defaultState))}catch{}}
+function activateAccount(next){const previous=authSession,previousProgress=state;persistLocalState();setAuthSession(next);state=mergeProgress(loadState(progressStorageKey(next)),!previous||previous.user.id===next.user.id?previousProgress:null);persistLocalState();if(!previous)clearAnonymousProgress();renderDashboard();renderLibrary();renderProgress()}
+function deactivateAccount(){persistLocalState();setAuthSession(null);state=loadState(STORAGE_KEY);renderDashboard();renderLibrary();renderProgress()}
+function authHeaders(token=authSession?.access_token){const headers={apikey:SUPABASE_KEY,"Content-Type":"application/json"};if(token)headers.Authorization=`Bearer ${token}`;return headers}
+async function supabaseRequest(path,{method="GET",body,token,headers={}}={}){const response=await fetch(`${SUPABASE_URL}${path}`,{method,headers:{...authHeaders(token),...headers},body:body===undefined?undefined:JSON.stringify(body)});if(!response.ok){let detail={};try{detail=await response.json()}catch{}throw new Error(detail.msg||detail.message||detail.error_description||detail.error||`请求失败（${response.status}）`)}if(response.status===204)return null;const text=await response.text();return text?JSON.parse(text):null}
+function normalizeSession(data){if(!data?.access_token)return null;return {...data,expires_at:data.expires_at||Math.floor(Date.now()/1000)+(data.expires_in||3600)}}
+async function ensureSession(){if(!authSession)return null;const current=authSession,epoch=authEpoch;if((current.expires_at||0)>Math.floor(Date.now()/1000)+60)return current;try{const data=await supabaseRequest("/auth/v1/token?grant_type=refresh_token",{method:"POST",body:{refresh_token:current.refresh_token},token:null});if(epoch!==authEpoch||authSession!==current)return null;setAuthSession(normalizeSession(data));return authSession}catch{if(epoch===authEpoch&&authSession===current){syncStatus="暂时无法刷新登录，请检查网络后重试"}return null}}
+function wordRecordScore(record={}){return +(record.modifiedAt||0)||Date.parse(record.lastSeen||"")||+(record.seen||0)}
+function mergeProgress(local,cloud){
+  const a={...defaultState,...(local||{}),words:{...(local?.words||{})},activity:{...(local?.activity||{})}},b={...defaultState,...(cloud||{})};
+  const merged={...defaultState,dailyGoal:(b.updatedAt||0)>(a.updatedAt||0)?b.dailyGoal:a.dailyGoal,words:{},activity:{},lastStudyDate:[a.lastStudyDate,b.lastStudyDate].filter(Boolean).sort().pop()||null,updatedAt:Math.max(a.updatedAt||0,b.updatedAt||0)};
+  new Set([...Object.keys(a.words||{}),...Object.keys(b.words||{})]).forEach(id=>{const left=a.words?.[id],right=b.words?.[id];merged.words[id]=!left?right:!right?left:wordRecordScore(right)>wordRecordScore(left)?right:left});
+  new Set([...Object.keys(a.activity||{}),...Object.keys(b.activity||{})]).forEach(day=>{const left=a.activity?.[day]||{},right=b.activity?.[day]||{};merged.activity[day]={completed:Math.max(left.completed||0,right.completed||0),reviews:Math.max(left.reviews||0,right.reviews||0),new:Math.max(left.new||0,right.new||0),spelling:Math.max(left.spelling||0,right.spelling||0)}});
+  return merged;
+}
+function scheduleCloudSync(){if(!authSession)return;clearTimeout(syncTimer);syncTimer=setTimeout(()=>syncProgress(),900)}
+async function syncProgress(notify=false){
+  if(!authSession)return false;if(syncBusy){syncQueued=true;return false}syncBusy=true;const replaceCloud=replaceCloudOnNextSync;replaceCloudOnNextSync=false;syncStatus="正在同步…";renderAccountUI();
+  try{const valid=await ensureSession();if(!valid)throw new Error("登录已过期");const rows=await supabaseRequest(`/rest/v1/user_progress?select=state&user_id=eq.${encodeURIComponent(valid.user.id)}`);if(!replaceCloud)state=mergeProgress(state,rows?.[0]?.state);persistLocalState();await supabaseRequest("/rest/v1/user_progress?on_conflict=user_id",{method:"POST",body:{user_id:valid.user.id,state},token:valid.access_token,headers:{Prefer:"resolution=merge-duplicates"}});syncStatus=`已同步 · ${new Date().toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"})}`;renderDashboard();renderLibrary();renderProgress();if(notify)showToast("学习进度已同步")}
+  catch(error){if(replaceCloud)replaceCloudOnNextSync=true;syncStatus="同步失败，稍后会自动重试";clearTimeout(syncTimer);if(authSession)syncTimer=setTimeout(()=>syncProgress(),15000);if(notify)showToast(authErrorText(error.message))}
+  finally{syncBusy=false;renderAccountUI();if(syncQueued){syncQueued=false;scheduleCloudSync()}}
+  return true;
+}
+function ws(id){return state.words[id]||{stage:-1,due:0,errors:0,unknowns:0,correct:0,seen:0,lastSeen:null,learnedOn:null}}
+function learnedToday(date=localDate()){
+  const logged=Number(state.activity?.[date]?.new);
+  if(Number.isFinite(logged))return Math.max(0,logged);
+  return WORDS.filter(word=>ws(word.id).learnedOn===date).length;
+}
+function renderPlanPreview(word,label){
+  const set=(selector,value)=>{const node=document.querySelector(selector);if(node)node.textContent=value};
+  set("#plan-preview-tag",label);
+  set("#plan-preview-word",word?.en||"complete");
+  set("#plan-preview-phonetic",word?.phonetic||"");
+  set("#plan-preview-meaning",word?primaryMeaning(word):"今日计划已完成");
+}
+function dueWords(){const now=dayStart();return WORDS.filter(w=>{const s=ws(w.id);return s.stage>=0&&s.due<=now}).sort((a,b)=>(ws(b.id).unknowns||0)-(ws(a.id).unknowns||0)||(ws(b.id).errors||0)-(ws(a.id).errors||0)||ws(a.id).due-ws(b.id).due)}
+function unseenWords(){return WORDS.filter(w=>ws(w.id).stage<0)}
+function weakWords(){return WORDS.filter(w=>ws(w.id).errors>0||(ws(w.id).unknowns||0)>0).sort((a,b)=>(ws(b.id).unknowns||0)-(ws(a.id).unknowns||0)||ws(b.id).errors-ws(a.id).errors)}
+function newAllowance(){return Math.max(0,state.dailyGoal-learnedToday())}
+function todayQueue(){return [...dueWords(),...unseenWords().slice(0,newAllowance())]}
+function streak(){const days=Object.keys(state.activity).filter(k=>state.activity[k]?.completed>0).sort().reverse();if(!days.length)return 0;let cursor=dayStart(),count=0;const today=localDate();if(days[0]!==today)cursor-=DAY;while(days.includes(localDate(new Date(cursor)))){count++;cursor-=DAY}return count}
+function showToast(text){const el=document.querySelector("#toast");el.textContent=text;el.classList.add("show");setTimeout(()=>el.classList.remove("show"),2200)}
+let activeUtterance=null,activeAudio=null,activeSpeechText="",speechRequestId=0,speechStartTimer=null,englishVoices=[],speechSourceMode="idle";
+function availableVoices(){return "speechSynthesis" in window?window.speechSynthesis.getVoices():[]}
+function refreshEnglishVoices(){englishVoices=availableVoices().filter(voice=>voice.lang?.toLowerCase().startsWith("en"));return englishVoices}
+function speechVoicePlan(){
+  const english=availableVoices().filter(voice=>voice.lang?.toLowerCase().startsWith("en")),localEnglish=english.filter(voice=>voice.localService);
+  return [...new Set([
+    localEnglish.find(voice=>voice.lang.toLowerCase()==="en-us"),
+    localEnglish.find(voice=>voice.default),
+    localEnglish[0],
+    english.find(voice=>voice.lang.toLowerCase()==="en-us"),
+    english.find(voice=>voice.default),
+    ...english
+  ].filter(Boolean))];
+}
+function preferredEnglishVoice(attempt=0){const plan=speechVoicePlan();return plan[Math.min(attempt,Math.max(0,plan.length-1))]||null}
+function waitForEnglishVoices(timeout=900){
+  if(refreshEnglishVoices().length||!("speechSynthesis" in window))return Promise.resolve(englishVoices);
+  return new Promise(resolve=>{let settled=false;const done=()=>{if(settled)return;settled=true;clearTimeout(timer);window.speechSynthesis.removeEventListener?.("voiceschanged",changed);resolve(refreshEnglishVoices())},changed=()=>{if(refreshEnglishVoices().length)done()},timer=setTimeout(done,timeout);window.speechSynthesis.addEventListener?.("voiceschanged",changed);window.speechSynthesis.getVoices()});
+}
+function pronunciationUrls(text){const word=encodeURIComponent(String(text).trim().toLowerCase());return [`https://dict.youdao.com/dictvoice?audio=${word}&type=2`,`https://dict.youdao.com/dictvoice?audio=${word}&type=1`,`https://fanyi.baidu.com/gettts?lan=en&text=${word}&spd=3&source=web`]}
+function updateSpeechButtons(text,status="idle"){
+  document.querySelectorAll("[data-speak]").forEach(button=>{if(button.dataset.speak!==text)return;button.classList.toggle("speaking",status==="speaking");button.classList.toggle("speech-pending",status==="pending");button.classList.toggle("speech-error",status==="error");button.setAttribute("aria-busy",String(status==="pending"||status==="speaking"));button.textContent=status==="pending"?"…":status==="speaking"?"🔉":"🔊";button.title=status==="pending"?"正在准备发音":status==="speaking"?"正在播放":status==="error"?"播放失败，点击重试":"点击发音"});
+}
+function stopActiveSpeech(){clearTimeout(speechStartTimer);if(activeAudio){activeAudio.onplay=activeAudio.onended=activeAudio.onerror=null;activeAudio.pause();activeAudio.removeAttribute("src");activeAudio.load();activeAudio=null}if("speechSynthesis" in window)window.speechSynthesis.cancel();activeUtterance=null;speechSourceMode="idle"}
+function finishSpeech(requestId,status="idle"){if(requestId!==speechRequestId)return;clearTimeout(speechStartTimer);updateSpeechButtons(activeSpeechText,status);activeUtterance=null;activeAudio=null;speechSourceMode=status;if(status==="idle")activeSpeechText=""}
+function playOnlinePronunciation(text,requestId,provider=0){
+  if(requestId!==speechRequestId)return;const urls=pronunciationUrls(text);
+  if(provider>=urls.length){finishSpeech(requestId,"error");showToast(navigator.onLine?"英文发音暂时不可用，请稍后重试":"当前离线，且电脑未安装英文语音");return}
+  clearTimeout(speechStartTimer);let started=false,finished=false;const audio=new Audio(urls[provider]),tryNext=()=>{if(finished||requestId!==speechRequestId)return;finished=true;clearTimeout(speechStartTimer);audio.pause();if(activeAudio===audio)activeAudio=null;setTimeout(()=>playOnlinePronunciation(text,requestId,provider+1),80)};
+  activeAudio=audio;speechSourceMode=`online-${provider+1}`;audio.preload="auto";audio.volume=1;audio.playbackRate=.92;
+  audio.onplay=()=>{if(requestId!==speechRequestId)return;started=true;clearTimeout(speechStartTimer);updateSpeechButtons(text,"speaking")};
+  audio.onended=()=>{finished=true;finishSpeech(requestId)};audio.onerror=tryNext;
+  audio.play().catch(tryNext);speechStartTimer=setTimeout(()=>{if(!started)tryNext()},5000);
+}
+function beginSystemSpeech(text,requestId,attempt=0){
+  if(requestId!==speechRequestId)return;const plan=speechVoicePlan(),synth=window.speechSynthesis;
+  if(attempt>=plan.length){playOnlinePronunciation(text,requestId);return}
+  clearTimeout(speechStartTimer);let started=false;const utterance=new SpeechSynthesisUtterance(text),voice=preferredEnglishVoice(attempt);activeUtterance=utterance;speechSourceMode="system";utterance.lang=voice?.lang||"en-US";utterance.rate=.82;utterance.pitch=1;utterance.volume=1;utterance.voice=voice;
+  utterance.onstart=()=>{if(requestId!==speechRequestId)return;started=true;clearTimeout(speechStartTimer);updateSpeechButtons(text,"speaking")};
+  utterance.onend=()=>finishSpeech(requestId);
+  utterance.onerror=event=>{if(requestId!==speechRequestId||["canceled","interrupted"].includes(event.error))return;clearTimeout(speechStartTimer);synth.cancel();setTimeout(()=>beginSystemSpeech(text,requestId,attempt+1),120)};
+  try{if(synth.paused)synth.resume();synth.speak(utterance)}catch{synth.cancel();setTimeout(()=>beginSystemSpeech(text,requestId,attempt+1),120);return}
+  speechStartTimer=setTimeout(()=>{if(requestId!==speechRequestId||started)return;synth.cancel();beginSystemSpeech(text,requestId,attempt+1)},3500);
+}
+async function speakWord(text){
+  if(!text)return;const requestId=++speechRequestId;if(activeSpeechText)updateSpeechButtons(activeSpeechText,"idle");stopActiveSpeech();activeSpeechText=text;updateSpeechButtons(text,"pending");
+  await waitForEnglishVoices();if(requestId!==speechRequestId)return;
+  if("speechSynthesis" in window&&"SpeechSynthesisUtterance" in window&&speechVoicePlan().length){setTimeout(()=>beginSystemSpeech(text,requestId),70)}else{playOnlinePronunciation(text,requestId)}
+}
+if("speechSynthesis" in window){refreshEnglishVoices();window.speechSynthesis.addEventListener?.("voiceschanged",refreshEnglishVoices)}
+
+function authErrorText(message=""){
+  const text=message.toLowerCase();
+  if(text.includes("invalid login credentials"))return "邮箱或密码不正确";
+  if(text.includes("email not confirmed"))return "请先打开验证邮件完成邮箱确认";
+  if(text.includes("user already registered"))return "这个邮箱已经注册，请直接登录";
+  if(text.includes("password should be"))return "密码至少需要 6 位";
+  if(text.includes("unable to validate")||text.includes("expired"))return "登录已过期，请重新登录";
+  if(text.includes("failed to fetch")||text.includes("network"))return "网络连接失败，请稍后重试";
+  return message||"操作失败，请稍后重试";
+}
+function accountLabel(){return authSession?.user?.email?.split("@")[0]||"登录并同步"}
+function renderAccountUI(){
+  const signedIn=!!authSession?.user, name=document.querySelector("#profile-name"),avatar=document.querySelector("#profile-avatar"),icon=document.querySelector(".account-icon");
+  if(name)name.textContent=signedIn?accountLabel():"登录并同步";
+  if(avatar)avatar.textContent=signedIn?accountLabel().slice(0,2).toUpperCase():"Hi";
+  if(icon){icon.textContent=signedIn?"✓":"☁";icon.classList.toggle("synced",signedIn)}
+  const modal=document.querySelector("#auth-modal");if(modal?.classList.contains("active"))renderAuthModal();
+}
+function renderAuthModal(){
+  const content=document.querySelector("#auth-content");if(!content)return;
+  if(authSession?.user){
+    content.innerHTML=`<span class="eyebrow">CLOUD SYNC · 云端同步</span><h2>进度已连接</h2><p class="auth-lead">同一账号登录手机、平板或电脑，学习记录会自动合并。</p><div class="account-summary"><div class="avatar">${escapeAttr(accountLabel().slice(0,2).toUpperCase())}</div><div><strong>${escapeAttr(authSession.user.email||"")}</strong><small id="sync-status-text">${escapeAttr(syncStatus)}</small></div></div><button class="primary-button full" id="sync-now" ${syncBusy?"disabled":""}>${syncBusy?"正在同步…":"立即同步"}</button><button class="text-button danger" id="logout-account">退出登录</button>`;
+    document.querySelector("#sync-now").onclick=()=>syncProgress(true);
+    document.querySelector("#logout-account").onclick=logoutAccount;
+    return;
+  }
+  const isLogin=authMode==="login";
+  content.innerHTML=`<span class="eyebrow">CLOUD SYNC · 云端同步</span><h2>${isLogin?"登录同步进度":"创建学习账号"}</h2><p class="auth-lead">${isLogin?"在所有设备上使用同一个邮箱和密码。":"注册后，当前设备已有的学习记录会自动上传。"}</p><div class="auth-tabs"><button class="${isLogin?"active":""}" data-auth-mode="login">登录</button><button class="${!isLogin?"active":""}" data-auth-mode="signup">注册</button></div><form class="auth-form" id="auth-form"><label>邮箱<input id="auth-email" type="email" autocomplete="email" placeholder="name@example.com" required></label><label>密码<input id="auth-password" type="password" autocomplete="${isLogin?"current-password":"new-password"}" minlength="6" placeholder="至少 6 位" required></label>${authMessage?`<p class="auth-message">${escapeAttr(authMessage)}</p>`:""}<button class="primary-button full" type="submit">${isLogin?"登录并同步":"注册账号"}</button></form><p class="privacy-note">密码由 Supabase 安全处理，WordStep 不会读取或保存明文密码。</p>`;
+  content.querySelectorAll("[data-auth-mode]").forEach(button=>button.onclick=()=>{authMode=button.dataset.authMode;authMessage="";renderAuthModal()});
+  document.querySelector("#auth-form").onsubmit=handleAuthSubmit;
+}
+async function handleAuthSubmit(event){
+  event.preventDefault();const email=document.querySelector("#auth-email").value.trim(),password=document.querySelector("#auth-password").value,button=event.submitter||event.currentTarget.querySelector("button[type=submit]");button.disabled=true;button.textContent=authMode==="login"?"正在登录…":"正在注册…";authMessage="";
+  try{
+    if(authMode==="signup"){
+      const redirect=encodeURIComponent(`${location.origin}${location.pathname}`),data=await supabaseRequest(`/auth/v1/signup?redirect_to=${redirect}`,{method:"POST",body:{email,password}}),next=normalizeSession(data);
+      if(next){activateAccount(next);syncStatus="正在合并本机与云端进度…";await syncProgress(true);setModalOpen("#auth-modal",false)}
+      else{authMode="login";authMessage="注册成功！请打开邮箱中的验证邮件，验证后再回来登录。";renderAuthModal()}
+    }else{
+      const data=await supabaseRequest("/auth/v1/token?grant_type=password",{method:"POST",body:{email,password},token:null});activateAccount(normalizeSession(data));syncStatus="正在合并本机与云端进度…";await syncProgress(true);setModalOpen("#auth-modal",false)
+    }
+  }catch(error){authMessage=authErrorText(error.message);renderAuthModal()}
+}
+async function logoutAccount(){
+  const current=authSession;try{await syncProgress();if(current)await supabaseRequest("/auth/v1/logout",{method:"POST",token:current.access_token})}catch{}deactivateAccount();syncStatus="未登录 · 进度仅保存在当前设备";authMessage="";renderAuthModal();showToast("已退出登录，账号进度已保存在独立缓存中")
+}
+async function initAuth(){
+  renderAccountUI();if(!authSession)return;syncStatus="正在连接云端…";renderAccountUI();const valid=await ensureSession();if(valid)await syncProgress();else renderAccountUI()
+}
+const UPDATE_RELOAD_KEY="wordstep-update-target";
+async function checkForAppUpdate(){
+  if(session)return;
+  try{
+    const response=await fetch(`version.json?t=${Date.now()}`,{cache:"no-store"});if(!response.ok)return;
+    const remote=await response.json();if(!remote.version)return;
+    if(remote.version===APP_VERSION){sessionStorage.removeItem(UPDATE_RELOAD_KEY);return}
+    if(sessionStorage.getItem(UPDATE_RELOAD_KEY)===remote.version)return;
+    sessionStorage.setItem(UPDATE_RELOAD_KEY,remote.version);
+    const registration=await navigator.serviceWorker?.getRegistration();
+    await registration?.update();
+    let worker=registration?.waiting||registration?.installing;
+    if(worker&&worker.state==="installing")await new Promise(resolve=>{const timeout=setTimeout(resolve,4000);worker.addEventListener("statechange",()=>{if(worker.state==="installed"){clearTimeout(timeout);resolve()}},{once:true})});
+    worker=registration?.waiting||worker;
+    worker?.postMessage({type:"SKIP_WAITING"});
+    if(navigator.serviceWorker?.controller&&worker)await Promise.race([new Promise(resolve=>navigator.serviceWorker.addEventListener("controllerchange",resolve,{once:true})),new Promise(resolve=>setTimeout(resolve,2500))]);
+    const url=new URL(location.href);url.searchParams.set("_wv",remote.version);
+    setTimeout(()=>location.replace(url.href),150);
+  }catch{}
+}
+
+async function verifyContentBundle(){
+  const compactVersion=window.WORDSTEP_COMPACT_INFO?.version;
+  if(WORDS.length===5097&&compactVersion==="20261004-1")return true;
+  if(!navigator.onLine)return false;
+  const recoveryKey=`wordstep-bundle-repair-${APP_VERSION}`;
+  if(sessionStorage.getItem(recoveryKey))return false;
+  sessionStorage.setItem(recoveryKey,"1");
+  try{if("caches" in window)await Promise.all((await caches.keys()).filter(key=>key.startsWith("wordstep-")).map(key=>caches.delete(key)));const registration=await navigator.serviceWorker?.getRegistration();await registration?.update()}catch{}
+  const url=new URL(location.href);url.searchParams.set("_repair",`${APP_VERSION}-${Date.now()}`);setTimeout(()=>location.replace(url.href),100);return false;
+}
+
+function renderDashboard(){
+  const allDue=dueWords(),due=allDue.length,completedNew=learnedToday(),fresh=Math.min(newAllowance(),unseenWords().length),weak=weakWords().length,total=due+fresh;
+  document.querySelector("#today-date").textContent=new Intl.DateTimeFormat("zh-CN",{month:"long",day:"numeric",weekday:"long"}).format(new Date());
+  document.querySelector("#streak-number").textContent=streak();document.querySelector("#profile-streak").textContent=`连续学习 ${streak()} 天`;
+  document.querySelector("#review-count").textContent=due;document.querySelector("#new-count").textContent=fresh;document.querySelector("#new-completed").textContent=Math.min(completedNew,state.dailyGoal);document.querySelector("#new-goal").textContent=state.dailyGoal;document.querySelector("#weak-count").textContent=weak;
+  document.querySelector("#task-total").textContent=`${total} 个待完成`;
+  document.querySelector("#plan-summary").textContent= total ? `先复习 ${due} 词。今日新词目标 ${state.dailyGoal} 个，已完成 ${completedNew} 个，还需 ${fresh} 个，约需 ${Math.max(3,Math.ceil(total*0.7))} 分钟。` : "今天的计划已经完成。轻松一下，明天继续。";
+  const btn=document.querySelector("#start-session");btn.innerHTML=total?"开始今日学习 <span>→</span>":"再练一组易错词 <span>→</span>";
+  const next=unseenWords()[0],preview=allDue[0]||next;document.querySelector("#today-scene").textContent=next?`${next.level||state.level} · ${next.category}`:"当前等级已完成";renderPlanPreview(preview,allDue.length?"待复习":"下一个新词");
+  const activity=state.activity[localDate()]||{};document.querySelector("#review-progress").style.width=`${due?Math.min(100,(activity.reviews||0)/(due+(activity.reviews||0))*100):100}%`;
+  document.querySelector("#new-progress").style.width=`${state.dailyGoal?learnedToday()/state.dailyGoal*100:0}%`;document.querySelector("#weak-progress").style.width=`${weak?Math.min(100,(activity.spelling||0)/weak*100):100}%`;
+  renderWeek();
+}
+function renderWeek(){const box=document.querySelector("#week-chart");box.innerHTML="";let total=0;const labels=["日","一","二","三","四","五","六"];for(let i=6;i>=0;i--){const d=new Date(dayStart()-i*DAY),key=localDate(d),n=state.activity[key]?.completed||0;total+=n;box.insertAdjacentHTML("beforeend",`<div class="day-bar ${i===0?"today":""}"><div class="bar-track"><span class="bar-fill" style="height:${Math.min(100,Math.max(n?8:3,n*5))}%"></span></div><small>周${labels[d.getDay()]}</small></div>`)}document.querySelector("#week-total").textContent=`已练习 ${total} 词`}
+
+function renderLibrary(){
+  document.querySelector("#category-filters").innerHTML=["全部",...categoryNames].map(c=>`<button class="filter-button ${c===activeCategory?"active":""}" data-category="${c}">${c}</button>`).join("");
+  const learned=WORDS.filter(w=>ws(w.id).stage>=0).length, mastered=WORDS.filter(w=>ws(w.id).stage>=5).length;
+  document.querySelector("#library-stats").innerHTML=`<span class="small-stat"><strong>${WORDS.length}</strong> 总词汇</span><span class="small-stat"><strong>${learned}</strong> 已学习</span><span class="small-stat"><strong>${mastered}</strong> 已掌握</span>`;
+  const q=document.querySelector("#word-search").value.trim().toLowerCase();const filtered=WORDS.filter(w=>(activeCategory==="全部"||w.category===activeCategory)&&(!q||w.en.includes(q)||w.zh.includes(q)));
+  const visible=filtered.slice(0,libraryLimit);
+  document.querySelector("#word-list").innerHTML=filtered.length?visible.map(w=>{const s=ws(w.id),example=exampleFor(w);const status=s.stage<0?["未学习",""]:s.stage>=5?["已掌握","mastered"]:["学习中","learning"];return `<div class="word-row"><div class="word-en"><div class="word-title"><strong>${w.en}</strong><button class="speak-button" data-speak="${escapeAttr(w.en)}" aria-label="朗读 ${escapeAttr(w.en)}" title="点击发音">🔊</button></div><small>${w.phonetic}</small></div><div class="word-zh">${w.zh}</div><div class="word-example">${escapeAttr(example.en)}<br><small>${escapeAttr(example.zh)}</small></div><span class="status-badge ${status[1]}">${status[0]}</span></div>`}).join("")+`${visible.length<filtered.length?`<button class="load-more" id="load-more">再显示 ${Math.min(100,filtered.length-visible.length)} 个 · 共 ${filtered.length} 个</button>`:""}`:`<div class="empty-state">没有找到匹配的单词</div>`;
+}
+function renderProgress(){
+  const learned=WORDS.filter(w=>ws(w.id).stage>=0), mastered=learned.filter(w=>ws(w.id).stage>=5), errors=Object.values(state.words).reduce((n,s)=>n+(s.errors||0),0), practiced=Object.values(state.activity).reduce((n,a)=>n+(a.completed||0),0);
+  document.querySelector("#progress-stats").innerHTML=[[learned.length,"已学习词汇","持续积累中"],[mastered.length,"长期掌握","间隔 ≥ 30 天"],[streak(),"连续学习","天"],[practiced,"累计练习","次"]].map(x=>`<article class="big-stat"><span>${x[1]}</span><strong>${x[0]}</strong><small>${x[2]}</small></article>`).join("");
+  const stages=[{n:"新认识",min:0,max:1},{n:"短期记忆",min:2,max:3},{n:"正在巩固",min:4,max:4},{n:"长期掌握",min:5,max:99}],counts=[];stages.forEach(x=>counts.push(learned.filter(w=>ws(w.id).stage>=x.min&&ws(w.id).stage<=x.max).length));const max=Math.max(1,...counts);
+  document.querySelector("#stage-list").innerHTML=stages.map((x,i)=>`<div class="stage-row"><span>${x.n}</span><div class="stage-track"><div class="stage-fill" style="width:${counts[i]/max*100}%;opacity:${.55+i*.15}"></div></div><strong>${counts[i]}</strong></div>`).join("");
+}
+
+function switchView(name){document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id===`${name}-view`));document.querySelectorAll(".nav-item[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===name));if(name==="library")renderLibrary();if(name==="progress")renderProgress();window.scrollTo(0,0)}
+function shuffle(a){return [...a].sort(()=>Math.random()-.5)}
+function distractorWords(word){return shuffle(WORDS.filter(w=>w.id!==word.id&&w.en!==word.en&&w.category===word.category&&conciseMeaning(w.zh)!==conciseMeaning(word.zh))).slice(0,3)}
+function openSession(){
+  let queue=todayQueue(),isExtra=false;if(!queue.length){queue=weakWords().slice(0,Math.max(5,state.dailyGoal));isExtra=true}if(!queue.length){showToast("全部词汇都完成了，太棒了！");return}
+  session={queue,idx:0,phase:"choice",correct:0,errors:0,unknowns:0,isExtra,studyDate:localDate(),currentHadError:false,currentErrorCount:0,currentUnknown:false,forceCorrection:false};
+  document.body.classList.add("session-open");document.querySelector("#session-overlay").classList.add("active");document.querySelector("#session-overlay").setAttribute("aria-hidden","false");renderQuestion();
+}
+function currentWord(){return session.queue[session.idx]}
+function renderQuestion(){
+  const w=currentWord(),progress=(session.idx/session.queue.length)*100;document.querySelector("#session-progress-bar").style.width=`${progress}%`;document.querySelector("#session-step").textContent=`${session.idx+1} / ${session.queue.length}`;
+  if(session.phase==="choice"){
+    const reverse=(w.id+session.idx)%2===0,field=reverse?"en":"zh",question=reverse?meaningWithPartOfSpeech(w):w.en,options=shuffle([w,...distractorWords(w)]),correctLabel=field==="zh"?meaningWithPartOfSpeech(w):w.en;
+    document.querySelector("#study-card").innerHTML=`<span class="question-type">${reverse?"中文 → 英文":"英文 → 中文"}</span><div class="question-word-row"><h2 class="question-main ${reverse?"chinese":""}">${escapeAttr(question)}</h2>${reverse?"":`<button class="speak-button large" data-speak="${escapeAttr(w.en)}" aria-label="朗读 ${escapeAttr(w.en)}">🔊</button>`}</div>${reverse?"":`<span class="phonetic">${escapeAttr(w.phonetic)}</span>`}<p class="question-note">选择正确含义，然后完成拼写</p><div class="choice-grid">${options.map(option=>field==="zh"?`<button class="choice meaning-choice" data-answer="${option.id}"><span class="choice-pos">${escapeAttr(option.pos)}</span><span>${escapeAttr(conciseMeaning(option.zh))}</span></button>`:`<button class="choice" data-answer="${option.id}">${escapeAttr(option.en)}</button>`).join("")}</div><div class="choice-unknown-wrap"><button class="unknown-button" id="choice-unknown" type="button">不认识这个词</button></div><div id="choice-feedback"></div>`;
+    document.querySelectorAll(".choice").forEach(btn=>btn.addEventListener("click",()=>answerChoice(btn,String(w.id),correctLabel,field==="en"?w.en:"",w.phonetic)));
+    document.querySelector("#choice-unknown").onclick=()=>markChoiceUnknown(String(w.id),correctLabel,field==="en"?w.en:"",w.phonetic);
+  }else renderSpelling();
+}
+function lockChoice(answer){document.querySelectorAll(".choice").forEach(b=>{b.disabled=true;if(b.dataset.answer===answer)b.classList.add("correct")});const unknown=document.querySelector("#choice-unknown");if(unknown)unknown.disabled=true}
+function choiceFeedback({correct,answer,speakText,phonetic,unknown=false}){document.querySelector("#choice-feedback").innerHTML=`<div class="feedback ${correct?"success":"error"}"><div><strong>${unknown?"已标记为不认识，正确答案：":correct?"答对了！":"记一下正确答案："} ${escapeAttr(answer)}</strong>${speakText?`<span class="phonetic feedback-phonetic">${escapeAttr(phonetic)}</span>`:""}</div><div class="feedback-actions">${speakText?`<button class="speak-button" data-speak="${escapeAttr(speakText)}" aria-label="朗读 ${escapeAttr(speakText)}">🔊</button>`:""}<button class="continue-button" id="to-spelling">继续拼写 →</button></div></div>`;document.querySelector("#to-spelling").onclick=()=>{session.phase="spelling";renderQuestion()}}
+function answerChoice(btn,answerId,answer,speakText,phonetic){const correct=btn.dataset.answer===answerId;lockChoice(answerId);if(!correct){btn.classList.add("wrong");session.errors++;session.currentErrorCount++;session.currentHadError=true}choiceFeedback({correct,answer,speakText,phonetic})}
+function markChoiceUnknown(answerId,answer,speakText,phonetic){lockChoice(answerId);session.errors++;session.unknowns++;session.currentErrorCount+=2;session.currentHadError=true;session.currentUnknown=true;session.forceCorrection=true;choiceFeedback({correct:false,answer,speakText,phonetic,unknown:true})}
+function renderSpelling(){const w=currentWord(),example=clozeExample(w);document.querySelector("#study-card").innerHTML=`<span class="question-type">拼写练习 · 必须拼对才能继续</span><h2 class="question-main chinese">${w.zh}</h2><span class="phonetic">${escapeAttr(w.phonetic)}</span><div class="spelling-example"><span>${example.kind==="definition"?"语境释义":"例句"}</span><p>${escapeAttr(example.en)}</p><small>${escapeAttr(example.zh)}</small></div><form class="spell-form" id="spell-form"><input class="spell-input" id="spell-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="输入英文单词" aria-label="输入英文拼写"><div class="spell-actions"><button class="primary-button" type="submit">检查拼写</button><button class="unknown-button" id="spell-unknown" type="button">不认识</button></div><div id="spell-feedback" aria-live="polite"></div></form>`;const input=document.querySelector("#spell-input");input.focus();document.querySelector("#spell-form").onsubmit=e=>{e.preventDefault();checkSpelling(input.value)};document.querySelector("#spell-unknown").onclick=markSpellingUnknown }
+function showSpellingCorrection(){const w=currentWord(),input=document.querySelector("#spell-input");input.classList.add("error");input.value="";input.placeholder="看一遍答案，再重新输入";document.querySelector("#spell-feedback").innerHTML=`<div class="correction-box">正确拼写是<div class="correction-word"><strong>${w.en}</strong><button type="button" class="speak-button" data-speak="${escapeAttr(w.en)}" aria-label="朗读 ${escapeAttr(w.en)}">🔊</button></div><span class="phonetic">${escapeAttr(w.phonetic)}</span>请重新完整输入一次，拼对后才能继续。</div>`;input.focus()}
+function markSpellingUnknown(){if(!session.currentUnknown){session.errors++;session.unknowns++;session.currentErrorCount+=2;session.currentHadError=true;session.currentUnknown=true}session.forceCorrection=true;const button=document.querySelector("#spell-unknown");if(button)button.disabled=true;showSpellingCorrection()}
+function checkSpelling(value){const w=currentWord(),input=document.querySelector("#spell-input"),normalized=value.trim().toLowerCase();if(normalized===w.en.toLowerCase()){
+    input.classList.add("success");input.disabled=true;document.querySelector(".spell-actions").hidden=true;session.correct++;const label=session.forceCorrection?"重新拼对了，这次会记得更牢。":"拼写正确！";document.querySelector("#spell-feedback").innerHTML=`<div class="feedback success"><div><strong>✓ ${label}</strong><span class="phonetic feedback-phonetic">${escapeAttr(w.phonetic)}</span></div><div class="feedback-actions"><button type="button" class="speak-button" data-speak="${escapeAttr(w.en)}" aria-label="朗读 ${escapeAttr(w.en)}">🔊</button><button type="button" class="continue-button" id="next-word">继续 →</button></div></div>`;document.querySelector("#next-word").onclick=finishWord;
+  }else{
+    session.errors++;session.currentErrorCount++;session.currentHadError=true;session.forceCorrection=true;showSpellingCorrection();
+  }}
+function finishWord(){
+  const w=currentWord(),s=ws(w.id),wasNew=s.stage<0;let stage=s.stage;
+  if(session.currentUnknown)stage=0;else if(session.currentHadError)stage=Math.max(0,stage-1);else stage=Math.min(STAGE_DAYS.length-1,stage+1);
+  if(wasNew)stage=0;const unknownTotal=session.currentUnknown?(s.unknowns||0)+1:Math.max(0,(s.unknowns||0)-(session.currentHadError?0:1)),errorPenalty=Math.min(0.75,(s.errors+session.currentErrorCount)*.08+unknownTotal*.1),interval=Math.max(1,Math.round(STAGE_DAYS[stage]*(1-errorPenalty)));
+  const key=session.studyDate||localDate();state.words[w.id]={...s,stage,due:dayStart()+interval*DAY,errors:s.errors+session.currentErrorCount,unknowns:unknownTotal,correct:s.correct+(!session.currentHadError?1:0),seen:s.seen+1,lastSeen:key,learnedOn:s.learnedOn||(wasNew?key:null),modifiedAt:Date.now()};
+  const a=state.activity[key]||{};state.activity[key]={completed:(a.completed||0)+1,reviews:(a.reviews||0)+(wasNew?0:1),new:(a.new||0)+(wasNew?1:0),spelling:(a.spelling||0)+1};state.lastStudyDate=key;saveState();
+  session.idx++;session.phase="choice";session.currentHadError=false;session.currentErrorCount=0;session.currentUnknown=false;session.forceCorrection=false;if(session.idx>=session.queue.length)renderComplete();else renderQuestion();
+}
+function renderComplete(){document.querySelector("#session-progress-bar").style.width="100%";document.querySelector("#session-step").textContent="完成";document.querySelector("#study-card").innerHTML=`<div class="completion-icon">✓</div><span class="question-type">TODAY COMPLETE</span><h2 class="question-main chinese">今天的训练完成了！</h2><p class="question-note">记忆不靠一次记住，而靠每次及时回来。</p><div class="completion-stats"><div><strong>${session.queue.length}</strong><span>完成词数</span></div><div><strong>${session.correct}</strong><span>正确拼写</span></div><div><strong>${session.errors}</strong><span>纠正次数</span></div></div><button class="primary-button" id="finish-session">返回首页</button>`;document.querySelector("#finish-session").onclick=closeSession}
+function closeSession(){document.body.classList.remove("session-open");document.querySelector("#session-overlay").classList.remove("active");document.querySelector("#session-overlay").setAttribute("aria-hidden","true");session=null;renderDashboard();renderProgress()}
+function escapeAttr(s){return String(s).replaceAll("&","&amp;").replaceAll('"',"&quot;").replaceAll("'","&#39;").replaceAll("<","&lt;").replaceAll(">","&gt;")}
+function setModalOpen(selector,open){const modal=document.querySelector(selector);modal.classList.toggle("active",open);modal.setAttribute("aria-hidden",String(!open));if(open)setTimeout(()=>modal.querySelector("input,button")?.focus(),0)}
+
+document.querySelectorAll(".nav-item[data-view]").forEach(b=>b.addEventListener("click",()=>switchView(b.dataset.view)));
+document.querySelectorAll('[data-action="open-settings"]').forEach(b=>b.addEventListener("click",()=>{document.querySelector("#daily-range").value=state.dailyGoal;updateRange();setModalOpen("#settings-modal",true)}));
+document.querySelectorAll('[data-action="close-settings"]').forEach(b=>b.addEventListener("click",()=>setModalOpen("#settings-modal",false)));
+document.querySelectorAll('[data-action="open-auth"]').forEach(b=>b.addEventListener("click",()=>{authMessage="";renderAuthModal();setModalOpen("#auth-modal",true)}));
+document.querySelectorAll('[data-action="close-auth"]').forEach(b=>b.addEventListener("click",()=>setModalOpen("#auth-modal",false)));
+document.querySelector("#daily-range").addEventListener("input",updateRange);function updateRange(){const n=+document.querySelector("#daily-range").value;document.querySelector("#daily-value").textContent=n;document.querySelector("#estimated-time").textContent=Math.ceil(n*.75)}
+document.querySelector("#save-settings").onclick=()=>{state.dailyGoal=+document.querySelector("#daily-range").value;saveState();setModalOpen("#settings-modal",false);renderDashboard();showToast("学习计划已更新")};
+document.querySelector("#reset-progress").onclick=()=>{if(confirm("确定要清除全部学习记录吗？此操作无法撤销。")){state=structuredClone(defaultState);saveState({replaceCloud:true});setModalOpen("#settings-modal",false);renderDashboard();showToast("学习记录已重置")}};
+document.querySelector("#start-session").onclick=openSession;document.querySelector("#close-session").onclick=()=>{if(confirm("要先退出吗？已经完成的单词会保留进度。"))closeSession()};
+document.querySelector("#word-search").addEventListener("input",()=>{libraryLimit=100;renderLibrary()});document.querySelector("#category-filters").addEventListener("click",e=>{if(e.target.dataset.category){activeCategory=e.target.dataset.category;libraryLimit=100;renderLibrary()}});
+document.querySelector("#word-list").addEventListener("click",e=>{if(e.target.id==="load-more"){libraryLimit+=100;renderLibrary()}});
+document.addEventListener("click",e=>{const button=e.target.closest("[data-speak]");if(button){e.preventDefault();e.stopPropagation();speakWord(button.dataset.speak)}});
+document.addEventListener("keydown",e=>{if(e.key!=="Enter"||e.repeat||!session||!document.querySelector("#session-overlay").classList.contains("active"))return;const next=document.querySelector("#next-word")||document.querySelector("#to-spelling")||document.querySelector("#finish-session");if(next){e.preventDefault();next.click()}});
+document.addEventListener("keydown",e=>{if(e.key!=="Escape")return;if(document.querySelector("#auth-modal").classList.contains("active"))setModalOpen("#auth-modal",false);else if(document.querySelector("#settings-modal").classList.contains("active"))setModalOpen("#settings-modal",false)});
+document.querySelector("#settings-modal").addEventListener("click",e=>{if(e.target.id==="settings-modal")setModalOpen("#settings-modal",false)});
+document.querySelector("#auth-modal").addEventListener("click",e=>{if(e.target.id==="auth-modal")setModalOpen("#auth-modal",false)});
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){refreshEnglishVoices();if(authSession)syncProgress();checkForAppUpdate()}else{stopActiveSpeech();finishSpeech(speechRequestId)}});
+window.addEventListener("online",()=>{if(authSession)syncProgress()});
+
+verifyContentBundle().then(valid=>{if(valid){renderDashboard();renderLibrary();renderProgress();initAuth();checkForAppUpdate()}});
