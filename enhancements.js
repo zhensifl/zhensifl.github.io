@@ -1,8 +1,8 @@
 /* WordStep 2026 learning-system upgrade. Loaded after app.js to preserve old progress. */
 const WORDSTEP_LEVELS = ["A2","B1","B2"];
 const WORDSTEP_SETTINGS = ["dailyGoal","level","track","trainingMode","reviewLimit","placementDone"];
-const WORK_CATEGORIES = new Set(["办公沟通","协作反馈"]);
-const WORK_TRACK_CATEGORIES = new Set(["办公沟通","协作反馈","社交沟通","基础交流","日常表达","情绪表达"]);
+const WORK_CATEGORIES = new Set(["办公沟通","协作反馈","泳池救生","安全求助","餐饮服务","客户服务","排班薪资","零售收银","酒店客房"]);
+const WORK_TRACK_CATEGORIES = new Set([...WORK_CATEGORIES,"社交沟通","基础交流","日常表达","情绪表达"]);
 const RATING_LABELS = {again:"忘记",hard:"困难",good:"一般",easy:"简单"};
 const ENHANCED_DEFAULTS = {level:"A2",track:"all",trainingMode:"mixed",reviewLimit:50,placementDone:false};
 const NEW_WORD_DAILY_MAX = 70;
@@ -220,12 +220,12 @@ choiceFeedback=({correct,answer,speakText,phonetic,unknown=false})=>{
 renderSpelling=()=>{
   const word=currentWord(),example=clozeExample(word),dictation=session.currentQuestionType==="dictation";
   document.querySelector("#study-card").innerHTML=`<span class="question-type">${dictation?"DICTATION · 听写强化":"拼写练习 · 必须拼对才能继续"}</span>${dictation?`<div class="listening-prompt"><button class="speak-button large" data-speak="${escapeAttr(word.en)}" aria-label="播放单词发音">🔊</button><span class="mode-chip">听发音并拼写</span></div>`:`<h2 class="question-main chinese">${escapeAttr(primaryMeaning(word))}</h2><span class="phonetic">${escapeAttr(word.phonetic)}</span>`}<div class="spelling-example"><span>${example.kind==="definition"?"语境释义":"例句"}</span><p>${escapeAttr(example.en)}</p><small>${escapeAttr(example.zh)}</small></div>${phraseHintHtml(word,true)}<form class="spell-form" id="spell-form"><input class="spell-input" id="spell-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="输入英文单词" aria-label="输入英文拼写"><div class="spell-actions"><button class="primary-button" type="submit">检查拼写</button><button class="unknown-button" id="spell-unknown" type="button">不认识</button></div><div id="spell-feedback" aria-live="polite"></div></form>`;
-  const input=document.querySelector("#spell-input");input.focus();document.querySelector("#spell-form").onsubmit=event=>{event.preventDefault();checkSpelling(input.value)};document.querySelector("#spell-unknown").onclick=markSpellingUnknown;if(dictation){session.listening++;setTimeout(()=>{if(session&&currentWord()?.id===word.id)speakWord(word.en)},100)}
+  const input=document.querySelector("#spell-input");input.placeholder=word.en.includes(" ")?"输入英文短语":"输入英文单词";input.focus();document.querySelector("#spell-form").onsubmit=event=>{event.preventDefault();checkSpelling(input.value)};document.querySelector("#spell-unknown").onclick=markSpellingUnknown;if(dictation){session.listening++;setTimeout(()=>{if(session&&currentWord()?.id===word.id)speakWord(word.en)},100)}
 };
 
 checkSpelling=value=>{
-  const word=currentWord(),input=document.querySelector("#spell-input"),normalized=value.trim().toLowerCase();
-  if(normalized===word.en.toLowerCase()){
+  const word=currentWord(),input=document.querySelector("#spell-input"),normalized=normalizeSpellingAnswer(value);
+  if(normalized===normalizeSpellingAnswer(word.en)){
     const automaticRating=session.currentUnknown?"again":session.currentHadError?"hard":"good";input.classList.add("success");input.disabled=true;document.querySelector(".spell-actions").hidden=true;session.correct++;const label=session.forceCorrection?"重新拼对了，这次会记得更牢。":"拼写正确！";document.querySelector("#spell-feedback").innerHTML=`${phraseHintHtml(word)}<div class="feedback success"><div><strong>✓ ${label}</strong><span class="phonetic feedback-phonetic">${escapeAttr(word.phonetic)}</span></div><div class="feedback-actions"><button type="button" class="speak-button" data-speak="${escapeAttr(word.en)}" aria-label="朗读 ${escapeAttr(word.en)}">🔊</button><button type="button" class="continue-button" id="next-word">继续 →</button></div></div>`;document.querySelector("#next-word").onclick=()=>finishWord(automaticRating);
   }else{session.errors++;session.currentErrorCount++;session.currentHadError=true;session.forceCorrection=true;showSpellingCorrection()}
 };
@@ -317,4 +317,4 @@ syncProgress=async(notify=false)=>{
 
 document.addEventListener("keydown",event=>{if(event.key==="Escape"&&document.querySelector("#placement-modal").classList.contains("active"))setModalOpen("#placement-modal",false)});
 ensurePlacementCompletion();populateEnhancedSettings();renderDashboard();renderLibrary();renderProgress();consumeRecoveryLink();setTimeout(()=>{if(!ensurePlacementCompletion())openPlacement(true)},700);
-window.WordStepEnhancements={version:"20261004-1",retrievability,nextSchedule,openPlacement,exportProgress,migrateLegacyMemoryState,vocabularyLevel,ensurePlacementCompletion};
+window.WordStepEnhancements={version:"20261015-1",retrievability,nextSchedule,openPlacement,exportProgress,migrateLegacyMemoryState,vocabularyLevel,ensurePlacementCompletion};

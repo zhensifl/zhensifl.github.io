@@ -146,11 +146,11 @@ const NEXT_AVAILABLE_WORD_ID=Math.max(0,...BASE_WORDS.map(word=>Number(word.id)|
 const ALL_WORDS = [...BASE_WORDS,...(window.WORDSTEP_ESSENTIAL_WORDS||[]).filter(word=>!BASE_WORD_KEYS.has(word.en.toLowerCase())).map((word,index)=>({...word,pos:partOfSpeech(word),id:NEXT_AVAILABLE_WORD_ID+index,isCurated:true,isEssential:true}))];
 function isUsefulVocabulary(word){return COMPACT_VOCABULARY||word.senseVersion==="20260903-1"&&word.qualityReady===true&&window.WORDSTEP_FOCUSED_WORDS?.has(word.en.toLowerCase())&&word.en.length>=3&&Number(word.frequencyRank||Infinity)>=MIN_GENERATED_RANK&&!word.base&&!word.proper&&!EXCLUDED_WORDS.has(word.en.toLowerCase())&&!/(?:男子名|女子名|人名|城市名|州名|国家名|国名|首都)/.test(word.zh)}
 const vocabularySeen=new Set();
-const WORDS = ALL_WORDS.filter(word=>{const key=word.en.toLowerCase();if(vocabularySeen.has(key))return false;if((TOO_BASIC_WORDS.has(key)&&!word.isEssential)||(!word.isCurated&&!isUsefulVocabulary(word)))return false;vocabularySeen.add(key);return true}).sort((a,b)=>(a.isDailyCore?-3:a.isEssential?-2:a.isCurated?-1:(window.WORDSTEP_FOCUS_PRIORITY?.[a.en]??3))-(b.isDailyCore?-3:b.isEssential?-2:b.isCurated?-1:(window.WORDSTEP_FOCUS_PRIORITY?.[b.en]??3))||(Number(a.frequencyRank)||Infinity)-(Number(b.frequencyRank)||Infinity));
+const WORDS = ALL_WORDS.filter(word=>{const key=word.en.toLowerCase();if(vocabularySeen.has(key))return false;if((TOO_BASIC_WORDS.has(key)&&!word.isEssential&&!word.usDaily)||(!word.isCurated&&!isUsefulVocabulary(word)))return false;vocabularySeen.add(key);return true}).sort((a,b)=>(a.isJobCore?-4:a.isDailyCore?-3:a.isEssential?-2:a.isCurated?-1:(window.WORDSTEP_FOCUS_PRIORITY?.[a.en]??3))-(b.isJobCore?-4:b.isDailyCore?-3:b.isEssential?-2:b.isCurated?-1:(window.WORDSTEP_FOCUS_PRIORITY?.[b.en]??3))||(Number(a.frequencyRank)||Infinity)-(Number(b.frequencyRank)||Infinity));
 
 const STORAGE_KEY = "wordstep-state-v1";
 const AUTH_STORAGE_KEY = "wordstep-auth-v1";
-const APP_VERSION = "20261004-1";
+const APP_VERSION = "20261015-1";
 const SUPABASE_URL = "https://wgvxdzwrvgktcidmofit.supabase.co";
 const SUPABASE_KEY = "sb_publishable_O2PaZM-nTJKAaeUYKiXbBw_r4WmllMx";
 const DAY = 86400000;
@@ -173,10 +173,11 @@ let storageWarningShown = false;
 
 function localDate(d=new Date()){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0");return `${y}-${m}-${day}`}
 function dayStart(d=new Date()){return new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime()}
-function extractPartOfSpeech(meaning=""){const found=[...meaning.matchAll(/(?:^|；)\s*(art|aux|conj|interj|num|prep|pron|adv|adj|a|vt|vi|v|n|pl)\./gi)].map(match=>({a:"adj",vt:"v",vi:"v",pl:"n"}[match[1].toLowerCase()]||match[1].toLowerCase()));return [...new Set(found)].map(pos=>`${pos}.`).join("/")}
+function extractPartOfSpeech(meaning=""){const found=[...meaning.matchAll(/(?:^|[；/\n])\s*(art|aux|conj|interj|num|prep|pron|adv|adj|a|vt|vi|v|n|pl|phr|abbr)\./gi)].map(match=>({a:"adj",vt:"v",vi:"v",pl:"n"}[match[1].toLowerCase()]||match[1].toLowerCase()));return [...new Set(found)].map(pos=>`${pos}.`).join("/")}
 function inferredPartOfSpeech(word){const en=word.en.toLowerCase();if(["the","a","an"].includes(en))return "art.";if(["i","you","he","she","it","we","they","me","him","her","us","them","this","that","these","those","who","what","which"].includes(en))return "pron.";if(["and","or","but","if","because","when","while","although"].includes(en))return "conj.";if(["in","on","at","to","for","from","with","by","about","into","over","after","before"].includes(en))return "prep.";if(["can","could","may","might","must","should","would","will"].includes(en))return "aux.";if(en.endsWith("ly"))return "adv.";if(/(tion|sion|ment|ness|ity|ship|ance|ence|er|or)$/.test(en))return "n.";if(/(ous|ful|less|able|ible|ive|al|ic|ish|ary)$/.test(en)||/的(?:；|$)/.test(word.zh))return "adj.";return "v."}
 function partOfSpeech(word){return CURATED_POS[word.en.toLowerCase()]||extractPartOfSpeech(word.zh)||extractPartOfSpeech(DICTIONARY_BY_EN.get(word.en.toLowerCase())?.zh)||inferredPartOfSpeech(word)}
-function cleanMeaning(meaning=""){return meaning.replace(/(^|；)\s*(?:art|aux|conj|interj|num|prep|pron|adv|adj|a|vt|vi|v|n|pl)\.\s*/gi,"$1").trim()}
+function cleanMeaning(meaning=""){return meaning.replace(/(^|[；\n])\s*(?:(?:art|aux|conj|interj|num|prep|pron|adv|adj|a|vt|vi|v|n|pl|phr|abbr)\.\s*(?:\/\s*)?)+/gi,"$1").trim()}
+function normalizeSpellingAnswer(value=""){return value.normalize("NFKC").replace(/[‘’]/g,"'").replace(/[‐‑–—]/g,"-").trim().replace(/\s+/g," ").toLowerCase()}
 function conciseMeaning(meaning=""){const parts=cleanMeaning(meaning).replace(/\r?\n/g," ").replace(/\[[^\]]*\]/g,"").split(/[；;]/).filter(Boolean).slice(0,2).map(part=>part.split(/[,，]/).filter(Boolean).slice(0,2).join("、"));const result=parts.join("；");return result.length>36?`${result.slice(0,35)}…`:result}
 function primaryMeaning(word){const value=cleanMeaning(word.zh).replace(/\r?\n/g," ").replace(/\[[^\]]*\]/g,"").split(/[；;,，]/).map(part=>part.trim()).find(Boolean)||word.category;return value.length>18?`${value.slice(0,17)}…`:value}
 function meaningWithPartOfSpeech(word){return `${word.pos} ${conciseMeaning(word.zh)}`}
@@ -301,7 +302,8 @@ function waitForEnglishVoices(timeout=900){
   if(refreshEnglishVoices().length||!("speechSynthesis" in window))return Promise.resolve(englishVoices);
   return new Promise(resolve=>{let settled=false;const done=()=>{if(settled)return;settled=true;clearTimeout(timer);window.speechSynthesis.removeEventListener?.("voiceschanged",changed);resolve(refreshEnglishVoices())},changed=()=>{if(refreshEnglishVoices().length)done()},timer=setTimeout(done,timeout);window.speechSynthesis.addEventListener?.("voiceschanged",changed);window.speechSynthesis.getVoices()});
 }
-function pronunciationUrls(text){const word=encodeURIComponent(String(text).trim().toLowerCase());return [`https://dict.youdao.com/dictvoice?audio=${word}&type=2`,`https://dict.youdao.com/dictvoice?audio=${word}&type=1`,`https://fanyi.baidu.com/gettts?lan=en&text=${word}&spd=3&source=web`]}
+function pronunciationText(text,spelledOut=false){const value=String(text).trim(),key=value.toLowerCase(),acronyms={cpr:"CPR",aed:"AED",ph:"pH"};if(acronyms[key])return spelledOut?acronyms[key].toUpperCase().split("").join(" "):acronyms[key];return value}
+function pronunciationUrls(text){const word=encodeURIComponent(pronunciationText(text));return [`https://dict.youdao.com/dictvoice?audio=${word}&type=2`,`https://dict.youdao.com/dictvoice?audio=${word}&type=1`,`https://fanyi.baidu.com/gettts?lan=en&text=${word}&spd=3&source=web`]}
 function updateSpeechButtons(text,status="idle"){
   document.querySelectorAll("[data-speak]").forEach(button=>{if(button.dataset.speak!==text)return;button.classList.toggle("speaking",status==="speaking");button.classList.toggle("speech-pending",status==="pending");button.classList.toggle("speech-error",status==="error");button.setAttribute("aria-busy",String(status==="pending"||status==="speaking"));button.textContent=status==="pending"?"…":status==="speaking"?"🔉":"🔊";button.title=status==="pending"?"正在准备发音":status==="speaking"?"正在播放":status==="error"?"播放失败，点击重试":"点击发音"});
 }
@@ -319,7 +321,7 @@ function playOnlinePronunciation(text,requestId,provider=0){
 function beginSystemSpeech(text,requestId,attempt=0){
   if(requestId!==speechRequestId)return;const plan=speechVoicePlan(),synth=window.speechSynthesis;
   if(attempt>=plan.length){playOnlinePronunciation(text,requestId);return}
-  clearTimeout(speechStartTimer);let started=false;const utterance=new SpeechSynthesisUtterance(text),voice=preferredEnglishVoice(attempt);activeUtterance=utterance;speechSourceMode="system";utterance.lang=voice?.lang||"en-US";utterance.rate=.82;utterance.pitch=1;utterance.volume=1;utterance.voice=voice;
+  clearTimeout(speechStartTimer);let started=false;const utterance=new SpeechSynthesisUtterance(pronunciationText(text,true)),voice=preferredEnglishVoice(attempt);activeUtterance=utterance;speechSourceMode="system";utterance.lang=voice?.lang||"en-US";utterance.rate=.82;utterance.pitch=1;utterance.volume=1;utterance.voice=voice;
   utterance.onstart=()=>{if(requestId!==speechRequestId)return;started=true;clearTimeout(speechStartTimer);updateSpeechButtons(text,"speaking")};
   utterance.onend=()=>finishSpeech(requestId);
   utterance.onerror=event=>{if(requestId!==speechRequestId||["canceled","interrupted"].includes(event.error))return;clearTimeout(speechStartTimer);synth.cancel();setTimeout(()=>beginSystemSpeech(text,requestId,attempt+1),120)};
@@ -404,8 +406,8 @@ async function checkForAppUpdate(){
 }
 
 async function verifyContentBundle(){
-  const compactVersion=window.WORDSTEP_COMPACT_INFO?.version;
-  if(WORDS.length===5097&&compactVersion==="20261004-1")return true;
+  const bundle=window.WORDSTEP_COMPACT_INFO;
+  if(bundle?.version===APP_VERSION&&Number.isSafeInteger(bundle.count)&&bundle.count>=1000&&WORDS.length===bundle.count)return true;
   if(!navigator.onLine)return false;
   const recoveryKey=`wordstep-bundle-repair-${APP_VERSION}`;
   if(sessionStorage.getItem(recoveryKey))return false;

@@ -2,6 +2,8 @@
 
 WordStep 的中文释义与音标主要来自 ECDICT。例句包括以下开放双语语料，以及 WordStep 为学习场景编写的短句。`WordStep simple examples` 表示独立编写并配有中文翻译的学习句；`Tatoeba short examples` 表示从 Tatoeba 筛选的简短双语句。每条记录保留例句来源。
 
+`WordStep US daily examples` 表示为日常生活、泳池救生和美国服务岗位独立编写的学习短句。岗位资料只用于选择交流场景，未复制培训手册或急救操作指导。
+
 - Tatoeba（通过 OPUS 获取）：Creative Commons Attribution 2.0 France（CC BY 2.0 FR）。https://opus.nlpl.eu/datasets/Tatoeba
 - ALT Parallel Corpus（通过 OPUS 获取）：Creative Commons Attribution 4.0（CC BY 4.0）。https://opus.nlpl.eu/datasets/ALT
 - WikiMatrix（通过 OPUS 获取）：Creative Commons Attribution-ShareAlike 4.0（CC BY-SA 4.0）。https://opus.nlpl.eu/datasets/WikiMatrix
