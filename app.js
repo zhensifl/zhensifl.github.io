@@ -150,13 +150,14 @@ const WORDS = ALL_WORDS.filter(word=>{const key=word.en.toLowerCase();if(vocabul
 
 const STORAGE_KEY = "wordstep-state-v1";
 const AUTH_STORAGE_KEY = "wordstep-auth-v1";
-const APP_VERSION = "20261015-1";
+const APP_VERSION = "20261016-1";
+const VOCABULARY_VERSION = "20261015-1";
 const SUPABASE_URL = "https://wgvxdzwrvgktcidmofit.supabase.co";
 const SUPABASE_KEY = "sb_publishable_O2PaZM-nTJKAaeUYKiXbBw_r4WmllMx";
 const DAY = 86400000;
 const STAGE_DAYS = [1,2,4,7,15,30,60];
 const categoryNames = [...new Set(WORDS.map(w=>w.category))];
-const defaultState = {dailyGoal:10, words:{}, activity:{}, lastStudyDate:null, updatedAt:0};
+const defaultState = {dailyGoal:10, words:{}, activity:{}, favorites:{}, lastStudyDate:null, updatedAt:0};
 let authSession = loadAuthSession();
 let state = loadInitialState();
 let activeCategory = "全部";
@@ -250,7 +251,7 @@ async function ensureSession(){if(!authSession)return null;const current=authSes
 function wordRecordScore(record={}){return +(record.modifiedAt||0)||Date.parse(record.lastSeen||"")||+(record.seen||0)}
 function mergeProgress(local,cloud){
   const a={...defaultState,...(local||{}),words:{...(local?.words||{})},activity:{...(local?.activity||{})}},b={...defaultState,...(cloud||{})};
-  const merged={...defaultState,dailyGoal:(b.updatedAt||0)>(a.updatedAt||0)?b.dailyGoal:a.dailyGoal,words:{},activity:{},lastStudyDate:[a.lastStudyDate,b.lastStudyDate].filter(Boolean).sort().pop()||null,updatedAt:Math.max(a.updatedAt||0,b.updatedAt||0)};
+  const merged={...defaultState,dailyGoal:(b.updatedAt||0)>(a.updatedAt||0)?b.dailyGoal:a.dailyGoal,words:{},activity:{},favorites:typeof mergeFavorites==="function"?mergeFavorites(a.favorites,b.favorites):{...(a.favorites||{}),...(b.favorites||{})},lastStudyDate:[a.lastStudyDate,b.lastStudyDate].filter(Boolean).sort().pop()||null,updatedAt:Math.max(a.updatedAt||0,b.updatedAt||0)};
   new Set([...Object.keys(a.words||{}),...Object.keys(b.words||{})]).forEach(id=>{const left=a.words?.[id],right=b.words?.[id];merged.words[id]=!left?right:!right?left:wordRecordScore(right)>wordRecordScore(left)?right:left});
   new Set([...Object.keys(a.activity||{}),...Object.keys(b.activity||{})]).forEach(day=>{const left=a.activity?.[day]||{},right=b.activity?.[day]||{};merged.activity[day]={completed:Math.max(left.completed||0,right.completed||0),reviews:Math.max(left.reviews||0,right.reviews||0),new:Math.max(left.new||0,right.new||0),spelling:Math.max(left.spelling||0,right.spelling||0)}});
   return merged;
@@ -407,7 +408,7 @@ async function checkForAppUpdate(){
 
 async function verifyContentBundle(){
   const bundle=window.WORDSTEP_COMPACT_INFO;
-  if(bundle?.version===APP_VERSION&&Number.isSafeInteger(bundle.count)&&bundle.count>=1000&&WORDS.length===bundle.count)return true;
+  if(bundle?.version===VOCABULARY_VERSION&&Number.isSafeInteger(bundle.count)&&bundle.count>=1000&&WORDS.length===bundle.count)return true;
   if(!navigator.onLine)return false;
   const recoveryKey=`wordstep-bundle-repair-${APP_VERSION}`;
   if(sessionStorage.getItem(recoveryKey))return false;
@@ -501,11 +502,11 @@ document.querySelector("#start-session").onclick=openSession;document.querySelec
 document.querySelector("#word-search").addEventListener("input",()=>{libraryLimit=100;renderLibrary()});document.querySelector("#category-filters").addEventListener("click",e=>{if(e.target.dataset.category){activeCategory=e.target.dataset.category;libraryLimit=100;renderLibrary()}});
 document.querySelector("#word-list").addEventListener("click",e=>{if(e.target.id==="load-more"){libraryLimit+=100;renderLibrary()}});
 document.addEventListener("click",e=>{const button=e.target.closest("[data-speak]");if(button){e.preventDefault();e.stopPropagation();speakWord(button.dataset.speak)}});
-document.addEventListener("keydown",e=>{if(e.key!=="Enter"||e.repeat||!session||!document.querySelector("#session-overlay").classList.contains("active"))return;const next=document.querySelector("#next-word")||document.querySelector("#to-spelling")||document.querySelector("#finish-session");if(next){e.preventDefault();next.click()}});
+document.addEventListener("keydown",e=>{if(e.key!=="Enter"||e.repeat||!session||e.target.closest?.("[data-favorite-id], [data-reveal-id]")||!document.querySelector("#session-overlay").classList.contains("active"))return;const next=document.querySelector("#next-word")||document.querySelector("#to-spelling")||document.querySelector("#finish-session");if(next){e.preventDefault();next.click()}});
 document.addEventListener("keydown",e=>{if(e.key!=="Escape")return;if(document.querySelector("#auth-modal").classList.contains("active"))setModalOpen("#auth-modal",false);else if(document.querySelector("#settings-modal").classList.contains("active"))setModalOpen("#settings-modal",false)});
 document.querySelector("#settings-modal").addEventListener("click",e=>{if(e.target.id==="settings-modal")setModalOpen("#settings-modal",false)});
 document.querySelector("#auth-modal").addEventListener("click",e=>{if(e.target.id==="auth-modal")setModalOpen("#auth-modal",false)});
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){refreshEnglishVoices();if(authSession)syncProgress();checkForAppUpdate()}else{stopActiveSpeech();finishSpeech(speechRequestId)}});
 window.addEventListener("online",()=>{if(authSession)syncProgress()});
 
-verifyContentBundle().then(valid=>{if(valid){renderDashboard();renderLibrary();renderProgress();initAuth();checkForAppUpdate()}});
+document.addEventListener("DOMContentLoaded",()=>verifyContentBundle().then(valid=>{if(valid){renderDashboard();renderLibrary();renderProgress();initAuth();checkForAppUpdate()}}),{once:true});

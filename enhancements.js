@@ -29,8 +29,12 @@ function ensurePlacementCompletion(){
 }
 const MEMORY_MODEL_VERSION = 2;
 function migrateLegacyMemoryState(source={}){
-  const migrated={...defaultState,...source,words:{},activity:{...(source.activity||{})},memoryModelVersion:MEMORY_MODEL_VERSION};
+  source=source&&typeof source==="object"&&!Array.isArray(source)?source:{};
+  const migrated={...defaultState,...source,words:{},activity:{...(source.activity||{})},favorites:normalizeFavorites(source.favorites),memoryModelVersion:MEMORY_MODEL_VERSION};
   let changed=source.memoryModelVersion!==MEMORY_MODEL_VERSION;
+  const favoriteSource=source.favorites;
+  if(!favoriteSource||typeof favoriteSource!=="object"||Array.isArray(favoriteSource)||Object.keys(favoriteSource).length!==Object.keys(migrated.favorites).length)changed=true;
+  else Object.entries(migrated.favorites).forEach(([id,record])=>{const previous=favoriteSource[id];if(Object.keys(previous).length!==3||previous.saved!==record.saved||previous.updatedAt!==record.updatedAt||previous.actor!==record.actor)changed=true});
   migrated.settingsBaselineAt=Number(source.settingsBaselineAt??source.updatedAt)||0;
   migrated.settingClocks={...(source.settingClocks||{})};
   WORDSTEP_SETTINGS.forEach(key=>{if(migrated.settingClocks[key]===undefined){migrated.settingClocks[key]=0;changed=true}});
@@ -98,7 +102,7 @@ ws=id=>enhancedRecord(id);
 
 mergeProgress=(local,cloud)=>{
   const a=migrateLegacyMemoryState(local||{}).state,b=migrateLegacyMemoryState(cloud||{}).state;
-  const merged={...defaultState,words:{},activity:{},settingClocks:{},settingsBaselineAt:Math.max(a.settingsBaselineAt||0,b.settingsBaselineAt||0),memoryModelVersion:MEMORY_MODEL_VERSION,lastStudyDate:[a.lastStudyDate,b.lastStudyDate].filter(Boolean).sort().pop()||null,updatedAt:Math.max(a.updatedAt||0,b.updatedAt||0)};
+  const merged={...defaultState,words:{},activity:{},favorites:mergeFavorites(a.favorites,b.favorites),settingClocks:{},settingsBaselineAt:Math.max(a.settingsBaselineAt||0,b.settingsBaselineAt||0),memoryModelVersion:MEMORY_MODEL_VERSION,lastStudyDate:[a.lastStudyDate,b.lastStudyDate].filter(Boolean).sort().pop()||null,updatedAt:Math.max(a.updatedAt||0,b.updatedAt||0)};
   WORDSTEP_SETTINGS.forEach(key=>{merged[key]=mergeSetting(a,b,key,defaultState[key]);if(a.settingClocks?.[key]!==undefined||b.settingClocks?.[key]!==undefined)merged.settingClocks[key]=Math.max(Number(a.settingClocks?.[key])||0,Number(b.settingClocks?.[key])||0)});
   if(a.placementDone||b.placementDone){merged.placementDone=true;merged.settingClocks.placementDone=Math.max(Number(a.settingClocks?.placementDone)||0,Number(b.settingClocks?.placementDone)||0)}
   new Set([...Object.keys(a.words),...Object.keys(b.words)]).forEach(id=>{const left=a.words[id],right=b.words[id];merged.words[id]=!left?right:!right?left:wordRecordScore(right)>wordRecordScore(left)?right:left});
@@ -277,7 +281,7 @@ document.querySelector("#library-level-filter").addEventListener("change",event=
 document.querySelector("#library-stats").addEventListener("click",event=>{if(event.target.id!=="clear-library-filters")return;activeCategory="全部";activeLevelFilter="全部";libraryLimit=100;document.querySelector("#word-search").value="";document.querySelector("#library-level-filter").value="全部";renderLibrary()});
 
 function exportProgress(){const payload={app:"WordStep",formatVersion:2,exportedAt:new Date().toISOString(),state};const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),anchor=document.createElement("a");anchor.href=url;anchor.download=`wordstep-backup-${localDate()}.json`;anchor.click();setTimeout(()=>URL.revokeObjectURL(url),500);showToast("学习记录已导出")}
-async function importProgressFile(file){try{const payload=JSON.parse(await file.text()),incoming=payload.state||payload;if(!incoming||typeof incoming!=="object"||typeof incoming.words!=="object"||typeof incoming.activity!=="object")throw new Error("文件格式不正确");if(!confirm("导入会用备份中的设置和学习记录替换当前设备数据，是否继续？"))return;state=migrateLegacyMemoryState({...defaultState,...incoming,words:{...incoming.words},activity:{...incoming.activity},updatedAt:Date.now()}).state;state.settingClocks=Object.fromEntries(WORDSTEP_SETTINGS.map(key=>[key,Date.now()]));saveState({replaceCloud:true});populateEnhancedSettings();renderDashboard();renderLibrary();renderProgress();setModalOpen("#settings-modal",false);showToast("学习记录已恢复并准备同步")}catch(error){showToast(`导入失败：${error.message}`)}}
+async function importProgressFile(file){try{const payload=JSON.parse(await file.text()),incoming=payload.state||payload;if(!incoming||typeof incoming!=="object"||typeof incoming.words!=="object"||typeof incoming.activity!=="object")throw new Error("文件格式不正确");if(!confirm("导入会用备份中的设置和学习记录替换当前设备数据，是否继续？"))return;state=migrateLegacyMemoryState({...defaultState,...incoming,words:{...incoming.words},activity:{...incoming.activity},favorites:Object.hasOwn(incoming,"favorites")?restoreFavorites(incoming.favorites,state.favorites,ACTIVITY_ACTOR):state.favorites,updatedAt:Date.now()}).state;state.settingClocks=Object.fromEntries(WORDSTEP_SETTINGS.map(key=>[key,Date.now()]));saveState({replaceCloud:true});populateEnhancedSettings();renderDashboard();renderLibrary();renderProgress();setModalOpen("#settings-modal",false);showToast("学习记录已恢复并准备同步")}catch(error){showToast(`导入失败：${error.message}`)}}
 document.querySelector("#export-progress").onclick=exportProgress;document.querySelector("#import-progress").onclick=()=>document.querySelector("#import-file").click();document.querySelector("#import-file").onchange=event=>{const file=event.target.files?.[0];if(file)importProgressFile(file);event.target.value=""};
 
 let deferredInstallPrompt=null;
@@ -317,4 +321,4 @@ syncProgress=async(notify=false)=>{
 
 document.addEventListener("keydown",event=>{if(event.key==="Escape"&&document.querySelector("#placement-modal").classList.contains("active"))setModalOpen("#placement-modal",false)});
 ensurePlacementCompletion();populateEnhancedSettings();renderDashboard();renderLibrary();renderProgress();consumeRecoveryLink();setTimeout(()=>{if(!ensurePlacementCompletion())openPlacement(true)},700);
-window.WordStepEnhancements={version:"20261015-1",retrievability,nextSchedule,openPlacement,exportProgress,migrateLegacyMemoryState,vocabularyLevel,ensurePlacementCompletion};
+window.WordStepEnhancements={version:"20261016-1",retrievability,nextSchedule,openPlacement,exportProgress,migrateLegacyMemoryState,vocabularyLevel,ensurePlacementCompletion};

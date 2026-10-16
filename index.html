@@ -16,6 +16,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="WordStep" />
   <link rel="stylesheet" href="styles.css?v=20261015-1" />
+  <link rel="stylesheet" href="favorites-20261016-1.css" />
 </head>
 <body>
   <div class="app-shell">
@@ -27,6 +28,7 @@
       <nav class="nav-list" aria-label="主导航">
         <button class="nav-item active" data-view="home"><span class="nav-icon">⌂</span><span>今日学习</span></button>
         <button class="nav-item" data-view="library"><span class="nav-icon">▤</span><span>词库</span></button>
+        <button class="nav-item" data-view="favorites"><span class="nav-icon">☆</span><span>收藏词库</span></button>
         <button class="nav-item" data-view="progress"><span class="nav-icon">↗</span><span>学习进度</span></button>
       </nav>
       <div class="sidebar-bottom">
@@ -106,6 +108,14 @@
         <div class="word-list" id="word-list"></div>
       </section>
 
+      <section id="favorites-view" class="view">
+        <div class="page-heading compact"><div><p class="eyebrow">MY FAVORITES</p><h1>我的收藏词库</h1><p>先看英文回想含义，点击单词显示中文。喇叭按钮可播放英语发音。</p></div></div>
+        <div class="favorites-toolbar"><label class="search-box" for="favorite-search">⌕ <input id="favorite-search" type="search" placeholder="搜索收藏的英文…" autocomplete="off" aria-label="搜索收藏的英文"></label><div class="favorites-count"><strong id="favorite-count">0</strong><span>个收藏</span></div></div>
+        <p class="favorites-status" id="favorite-result-count" aria-live="polite"></p>
+        <div class="favorite-grid" id="favorite-list"></div>
+        <button class="load-more" id="favorites-load-more" type="button" hidden>显示更多收藏</button>
+      </section>
+
       <section id="progress-view" class="view">
         <div class="page-heading compact"><div><p class="eyebrow">YOUR PROGRESS</p><h1>每一步都算数</h1><p>这里记录你正在建立的长期记忆。</p></div></div>
         <div class="stat-grid" id="progress-stats"></div>
@@ -120,6 +130,7 @@
     <nav class="mobile-nav" aria-label="手机导航">
       <button class="nav-item active" data-view="home" aria-label="学习"><span class="nav-icon">⌂</span><span>学习</span></button>
       <button class="nav-item" data-view="library" aria-label="词库"><span class="nav-icon">▤</span><span>词库</span></button>
+      <button class="nav-item" data-view="favorites" aria-label="收藏"><span class="nav-icon">☆</span><span>收藏</span></button>
       <button class="nav-item" data-view="progress" aria-label="进度"><span class="nav-icon">↗</span><span>进度</span></button>
     </nav>
   </div>
@@ -177,8 +188,9 @@
 
   <div class="toast" id="toast"></div>
   <script src="compact-words-20261015-1.js?v=20261015-1"></script>
-  <script src="app-20261015-1.js"></script>
-  <script src="sync-model-20261015-1.js"></script>
-  <script src="enhancements-20261015-1.js"></script>
+  <script src="app-20261016-1.js"></script>
+  <script src="sync-model-20261016-1.js"></script>
+  <script src="enhancements-20261016-1.js"></script>
+  <script src="favorites-20261016-1.js"></script>
 </body>
 </html>

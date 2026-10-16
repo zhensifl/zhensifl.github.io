@@ -55,3 +55,47 @@ function mergeSetting(a,b,key,fallback){
   }
   return (countValue(a.updatedAt)>=countValue(b.updatedAt)?a[key]:b[key])??fallback;
 }
+
+/* Favorites are independent per-word LWW registers, including removal tombstones.
+   Equal clocks prefer removal, then the greatest actor by code-unit order. */
+function normalizeFavorites(input){
+  const normalized={};
+  if(!input||typeof input!=="object"||Array.isArray(input))return normalized;
+  for(const id of Object.keys(input).sort((a,b)=>Number(a)-Number(b))){
+    if(!/^[1-9]\d*$/.test(id)||!Number.isSafeInteger(Number(id)))continue;
+    const value=input[id];
+    if(!value||typeof value!=="object"||Array.isArray(value)||!Object.hasOwn(value,"saved")||typeof value.saved!=="boolean")continue;
+    const updatedAt=Object.hasOwn(value,"updatedAt")&&value.updatedAt!==undefined?value.updatedAt:0;
+    if(!Number.isSafeInteger(updatedAt)||updatedAt<0)continue;
+    const actor=Object.hasOwn(value,"actor")&&typeof value.actor==="string"?value.actor:"";
+    normalized[id]={saved:value.saved,updatedAt,actor};
+  }
+  return normalized;
+}
+function mergeFavorites(a,b){
+  const left=normalizeFavorites(a),right=normalizeFavorites(b),merged={};
+  for(const id of [...new Set([...Object.keys(left),...Object.keys(right)])].sort((a,b)=>Number(a)-Number(b))){
+    const x=left[id],y=right[id];
+    let winner=x||y;
+    if(x&&y){
+      if(x.updatedAt!==y.updatedAt)winner=x.updatedAt>y.updatedAt?x:y;
+      else if(x.saved!==y.saved)winner=x.saved?y:x;
+      else winner=x.actor>=y.actor?x:y;
+    }
+    merged[id]={...winner};
+  }
+  return merged;
+}
+function nextFavoriteClock(records,now=Date.now()){
+  let latest=0;
+  for(const record of Object.values(normalizeFavorites(records)))latest=Math.max(latest,record.updatedAt);
+  if(latest===Number.MAX_SAFE_INTEGER)throw new RangeError("Favorite clock exceeds the safe integer range");
+  const current=Number.isSafeInteger(now)&&now>=0?now:Date.now();
+  return Math.max(current,latest+1);
+}
+function restoreFavorites(snapshot,current,actor,now=Date.now()){
+  const imported=normalizeFavorites(snapshot),existing=normalizeFavorites(current),known=mergeFavorites(imported,existing),restored={};
+  const updatedAt=nextFavoriteClock(known,now),restoreActor=typeof actor==="string"?actor:"";
+  for(const id of Object.keys(known))restored[id]={saved:imported[id]?.saved===true,updatedAt,actor:restoreActor};
+  return restored;
+}
