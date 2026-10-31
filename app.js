@@ -150,7 +150,7 @@ const WORDS = ALL_WORDS.filter(word=>{const key=word.en.toLowerCase();if(vocabul
 
 const STORAGE_KEY = "wordstep-state-v1";
 const AUTH_STORAGE_KEY = "wordstep-auth-v1";
-const APP_VERSION = "20261016-1";
+const APP_VERSION = "20261029-1";
 const VOCABULARY_VERSION = "20261015-1";
 const SUPABASE_URL = "https://wgvxdzwrvgktcidmofit.supabase.co";
 const SUPABASE_KEY = "sb_publishable_O2PaZM-nTJKAaeUYKiXbBw_r4WmllMx";
@@ -173,7 +173,9 @@ let authMessage = "";
 let storageWarningShown = false;
 
 function localDate(d=new Date()){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0");return `${y}-${m}-${day}`}
-function dayStart(d=new Date()){return new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime()}
+// Calendar days may be 23 or 25 hours in US time zones; DAY is elapsed time only.
+function calendarDay(offset=0,d=new Date()){return new Date(d.getFullYear(),d.getMonth(),d.getDate()+offset).getTime()}
+function dayStart(d=new Date()){return calendarDay(0,d)}
 function extractPartOfSpeech(meaning=""){const found=[...meaning.matchAll(/(?:^|[；/\n])\s*(art|aux|conj|interj|num|prep|pron|adv|adj|a|vt|vi|v|n|pl|phr|abbr)\./gi)].map(match=>({a:"adj",vt:"v",vi:"v",pl:"n"}[match[1].toLowerCase()]||match[1].toLowerCase()));return [...new Set(found)].map(pos=>`${pos}.`).join("/")}
 function inferredPartOfSpeech(word){const en=word.en.toLowerCase();if(["the","a","an"].includes(en))return "art.";if(["i","you","he","she","it","we","they","me","him","her","us","them","this","that","these","those","who","what","which"].includes(en))return "pron.";if(["and","or","but","if","because","when","while","although"].includes(en))return "conj.";if(["in","on","at","to","for","from","with","by","about","into","over","after","before"].includes(en))return "prep.";if(["can","could","may","might","must","should","would","will"].includes(en))return "aux.";if(en.endsWith("ly"))return "adv.";if(/(tion|sion|ment|ness|ity|ship|ance|ence|er|or)$/.test(en))return "n.";if(/(ous|ful|less|able|ible|ive|al|ic|ish|ary)$/.test(en)||/的(?:；|$)/.test(word.zh))return "adj.";return "v."}
 function partOfSpeech(word){return CURATED_POS[word.en.toLowerCase()]||extractPartOfSpeech(word.zh)||extractPartOfSpeech(DICTIONARY_BY_EN.get(word.en.toLowerCase())?.zh)||inferredPartOfSpeech(word)}
@@ -236,16 +238,24 @@ function loadInitialState(){
     const migrated=loadState(STORAGE_KEY);localStorage.setItem(key,JSON.stringify(migrated));localStorage.setItem(STORAGE_KEY,JSON.stringify(defaultState));return migrated;
   }catch{return loadState(key)}
 }
-function persistLocalState(){try{localStorage.setItem(progressStorageKey(),JSON.stringify(state));storageWarningShown=false;return true}catch(error){console.error("Local progress save failed",error);if(!storageWarningShown){storageWarningShown=true;showToast(authSession?"本机缓存写入失败，正在继续同步到云端":"本机存储空间不足，请登录后同步进度")}return false}}
-function saveState({replaceCloud=false}={}){state.updatedAt=Date.now();persistLocalState();if(replaceCloud)replaceCloudOnNextSync=true;scheduleCloudSync()}
+function persistLocalState({replaceCloud=false}={}){try{const key=progressStorageKey(),stored=localStorage.getItem(key);let incoming;if(stored){try{incoming=JSON.parse(stored)}catch{console.warn("Replacing invalid local progress cache")}}if(!replaceCloud)adoptStoredProgress(incoming);const unchanged=incoming&&typeof progressStateFingerprint==="function"&&progressStateFingerprint(incoming)===progressStateFingerprint(state);if(!unchanged)localStorage.setItem(key,JSON.stringify(state));storageWarningShown=false;return true}catch(error){console.error("Local progress save failed",error);if(!storageWarningShown){storageWarningShown=true;showToast(authSession?"本机缓存写入失败，正在继续同步到云端":"本机存储空间不足，请登录后同步进度")}return false}}
+function saveState({replaceCloud=false}={}){state.updatedAt=Date.now();persistLocalState({replaceCloud});if(replaceCloud)replaceCloudOnNextSync=true;scheduleCloudSync()}
+function adoptStoredProgress(incoming){
+  if(!incoming||typeof incoming!=="object"||Array.isArray(incoming))return false;
+  const replaced=typeof compareProgressEpoch==="function"&&compareProgressEpoch(incoming,state)>0;
+  state=mergeProgress(state,incoming);
+  if(replaced&&typeof session!=="undefined"&&session){closeSession();showToast("学习数据已在其他设备或标签页重置或恢复，请重新开始学习")}
+  return true;
+}
 function loadAuthSession(){try{return JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY)||"null")}catch{return null}}
 let authEpoch=0;
 function setAuthSession(next){if(authSession?.user?.id!==next?.user?.id){authEpoch++;clearTimeout(syncTimer);syncQueued=false;replaceCloudOnNextSync=false;if(session)closeSession()}authSession=next;try{if(next)localStorage.setItem(AUTH_STORAGE_KEY,JSON.stringify(next));else localStorage.removeItem(AUTH_STORAGE_KEY)}catch(error){console.error("Auth session cache failed",error);showToast("登录状态无法写入本机缓存，本次仍可继续使用")}renderAccountUI()}
 function clearAnonymousProgress(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(defaultState))}catch{}}
-function activateAccount(next){const previous=authSession,previousProgress=state;persistLocalState();setAuthSession(next);state=mergeProgress(loadState(progressStorageKey(next)),!previous||previous.user.id===next.user.id?previousProgress:null);persistLocalState();if(!previous)clearAnonymousProgress();renderDashboard();renderLibrary();renderProgress()}
+function preserveGuestTransfer(next,progress){try{const key=`${STORAGE_KEY}:guest-transfer:${next.user.id}`,stored=localStorage.getItem(key);let previous;try{previous=JSON.parse(stored||"null")}catch{}localStorage.setItem(key,JSON.stringify(mergeProgress(progress,previous)));return true}catch{showToast("游客记录备份未完成，已保留原本机记录");return false}}
+function activateAccount(next){const previous=authSession;persistLocalState();const previousProgress=state,guestPreserved=!!previous||preserveGuestTransfer(next,previousProgress);setAuthSession(next);const accountProgress=loadState(progressStorageKey(next)),incoming=!previous?{...previousProgress,progressEpoch:accountProgress.progressEpoch}:previous.user.id===next.user.id?previousProgress:null;state=mergeProgress(accountProgress,incoming);persistLocalState();if(!previous&&guestPreserved)clearAnonymousProgress();renderDashboard();renderLibrary();renderProgress()}
 function deactivateAccount(){persistLocalState();setAuthSession(null);state=loadState(STORAGE_KEY);renderDashboard();renderLibrary();renderProgress()}
 function authHeaders(token=authSession?.access_token){const headers={apikey:SUPABASE_KEY,"Content-Type":"application/json"};if(token)headers.Authorization=`Bearer ${token}`;return headers}
-async function supabaseRequest(path,{method="GET",body,token,headers={}}={}){const response=await fetch(`${SUPABASE_URL}${path}`,{method,headers:{...authHeaders(token),...headers},body:body===undefined?undefined:JSON.stringify(body)});if(!response.ok){let detail={};try{detail=await response.json()}catch{}throw new Error(detail.msg||detail.message||detail.error_description||detail.error||`请求失败（${response.status}）`)}if(response.status===204)return null;const text=await response.text();return text?JSON.parse(text):null}
+async function supabaseRequest(path,{method="GET",body,token,headers={}}={}){const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);try{const response=await fetch(`${SUPABASE_URL}${path}`,{method,headers:{...authHeaders(token),...headers},body:body===undefined?undefined:JSON.stringify(body),signal:controller.signal});if(!response.ok){let detail={};try{detail=await response.json()}catch{}throw new Error(detail.msg||detail.message||detail.error_description||detail.error||`请求失败（${response.status}）`)}if(response.status===204)return null;const text=await response.text();return text?JSON.parse(text):null}catch(error){if(controller.signal.aborted)throw new Error("网络请求超时，请检查网络后重试");throw error}finally{clearTimeout(timeout)}}
 function normalizeSession(data){if(!data?.access_token)return null;return {...data,expires_at:data.expires_at||Math.floor(Date.now()/1000)+(data.expires_in||3600)}}
 async function ensureSession(){if(!authSession)return null;const current=authSession,epoch=authEpoch;if((current.expires_at||0)>Math.floor(Date.now()/1000)+60)return current;try{const data=await supabaseRequest("/auth/v1/token?grant_type=refresh_token",{method:"POST",body:{refresh_token:current.refresh_token},token:null});if(epoch!==authEpoch||authSession!==current)return null;setAuthSession(normalizeSession(data));return authSession}catch{if(epoch===authEpoch&&authSession===current){syncStatus="暂时无法刷新登录，请检查网络后重试"}return null}}
 function wordRecordScore(record={}){return +(record.modifiedAt||0)||Date.parse(record.lastSeen||"")||+(record.seen||0)}
@@ -282,7 +292,7 @@ function unseenWords(){return WORDS.filter(w=>ws(w.id).stage<0)}
 function weakWords(){return WORDS.filter(w=>ws(w.id).errors>0||(ws(w.id).unknowns||0)>0).sort((a,b)=>(ws(b.id).unknowns||0)-(ws(a.id).unknowns||0)||ws(b.id).errors-ws(a.id).errors)}
 function newAllowance(){return Math.max(0,state.dailyGoal-learnedToday())}
 function todayQueue(){return [...dueWords(),...unseenWords().slice(0,newAllowance())]}
-function streak(){const days=Object.keys(state.activity).filter(k=>state.activity[k]?.completed>0).sort().reverse();if(!days.length)return 0;let cursor=dayStart(),count=0;const today=localDate();if(days[0]!==today)cursor-=DAY;while(days.includes(localDate(new Date(cursor)))){count++;cursor-=DAY}return count}
+function streak(){const days=Object.keys(state.activity).filter(k=>state.activity[k]?.completed>0).sort().reverse();if(!days.length)return 0;let offset=days[0]===localDate()?0:-1,count=0;while(days.includes(localDate(new Date(calendarDay(offset))))){count++;offset--}return count}
 function showToast(text){const el=document.querySelector("#toast");el.textContent=text;el.classList.add("show");setTimeout(()=>el.classList.remove("show"),2200)}
 let activeUtterance=null,activeAudio=null,activeSpeechText="",speechRequestId=0,speechStartTimer=null,englishVoices=[],speechSourceMode="idle";
 function availableVoices(){return "speechSynthesis" in window?window.speechSynthesis.getVoices():[]}
@@ -308,29 +318,50 @@ function pronunciationUrls(text){const word=encodeURIComponent(pronunciationText
 function updateSpeechButtons(text,status="idle"){
   document.querySelectorAll("[data-speak]").forEach(button=>{if(button.dataset.speak!==text)return;button.classList.toggle("speaking",status==="speaking");button.classList.toggle("speech-pending",status==="pending");button.classList.toggle("speech-error",status==="error");button.setAttribute("aria-busy",String(status==="pending"||status==="speaking"));button.textContent=status==="pending"?"…":status==="speaking"?"🔉":"🔊";button.title=status==="pending"?"正在准备发音":status==="speaking"?"正在播放":status==="error"?"播放失败，点击重试":"点击发音"});
 }
-function stopActiveSpeech(){clearTimeout(speechStartTimer);if(activeAudio){activeAudio.onplay=activeAudio.onended=activeAudio.onerror=null;activeAudio.pause();activeAudio.removeAttribute("src");activeAudio.load();activeAudio=null}if("speechSynthesis" in window)window.speechSynthesis.cancel();activeUtterance=null;speechSourceMode="idle"}
-function finishSpeech(requestId,status="idle"){if(requestId!==speechRequestId)return;clearTimeout(speechStartTimer);updateSpeechButtons(activeSpeechText,status);activeUtterance=null;activeAudio=null;speechSourceMode=status;if(status==="idle")activeSpeechText=""}
+function releaseSpeechAudio(audio=activeAudio){
+  if(!audio)return;
+  audio.onplay=audio.onplaying=audio.onwaiting=audio.onstalled=audio.onended=audio.onerror=null;
+  audio.pause();audio.removeAttribute("src");audio.load();if(activeAudio===audio)activeAudio=null;
+}
+function releaseSpeechUtterance(){if(activeUtterance)activeUtterance.onstart=activeUtterance.onend=activeUtterance.onerror=null;activeUtterance=null}
+function stopActiveSpeech(){
+  // Invalidate pending voice loads and delayed retries as well as current playback.
+  speechRequestId++;clearTimeout(speechStartTimer);releaseSpeechAudio();releaseSpeechUtterance();
+  if("speechSynthesis" in window)window.speechSynthesis.cancel();
+  if(activeSpeechText)updateSpeechButtons(activeSpeechText,"idle");activeSpeechText="";speechSourceMode="idle";
+}
+function finishSpeech(requestId,status="idle"){
+  if(requestId!==speechRequestId)return;
+  clearTimeout(speechStartTimer);updateSpeechButtons(activeSpeechText,status);releaseSpeechAudio();releaseSpeechUtterance();speechSourceMode=status;if(status==="idle")activeSpeechText="";
+}
 function playOnlinePronunciation(text,requestId,provider=0){
   if(requestId!==speechRequestId)return;const urls=pronunciationUrls(text);
   if(provider>=urls.length){finishSpeech(requestId,"error");showToast(navigator.onLine?"英文发音暂时不可用，请稍后重试":"当前离线，且电脑未安装英文语音");return}
-  clearTimeout(speechStartTimer);let started=false,finished=false;const audio=new Audio(urls[provider]),tryNext=()=>{if(finished||requestId!==speechRequestId)return;finished=true;clearTimeout(speechStartTimer);audio.pause();if(activeAudio===audio)activeAudio=null;setTimeout(()=>playOnlinePronunciation(text,requestId,provider+1),80)};
+  clearTimeout(speechStartTimer);let finished=false;const audio=new Audio(urls[provider]);
+  const current=()=>!finished&&requestId===speechRequestId&&activeAudio===audio;
+  const tryNext=()=>{if(!current())return;finished=true;clearTimeout(speechStartTimer);releaseSpeechAudio(audio);setTimeout(()=>playOnlinePronunciation(text,requestId,provider+1),80)};
+  const waiting=()=>{if(!current())return;clearTimeout(speechStartTimer);updateSpeechButtons(text,"pending");speechStartTimer=setTimeout(tryNext,5000)};
   activeAudio=audio;speechSourceMode=`online-${provider+1}`;audio.preload="auto";audio.volume=1;audio.playbackRate=.92;
-  audio.onplay=()=>{if(requestId!==speechRequestId)return;started=true;clearTimeout(speechStartTimer);updateSpeechButtons(text,"speaking")};
-  audio.onended=()=>{finished=true;finishSpeech(requestId)};audio.onerror=tryNext;
-  audio.play().catch(tryNext);speechStartTimer=setTimeout(()=>{if(!started)tryNext()},5000);
+  // `play` fires before buffering completes; only `playing` confirms output began.
+  audio.onplaying=()=>{if(!current())return;clearTimeout(speechStartTimer);updateSpeechButtons(text,"speaking");speechStartTimer=setTimeout(tryNext,30000)};
+  audio.onwaiting=waiting;audio.onstalled=waiting;
+  audio.onended=()=>{if(!current())return;finished=true;finishSpeech(requestId)};audio.onerror=tryNext;
+  waiting();try{audio.play().catch(tryNext)}catch{tryNext()}
 }
 function beginSystemSpeech(text,requestId,attempt=0){
-  if(requestId!==speechRequestId)return;const plan=speechVoicePlan(),synth=window.speechSynthesis;
+  if(requestId!==speechRequestId)return;const plan=speechVoicePlan().slice(0,2),synth=window.speechSynthesis;
   if(attempt>=plan.length){playOnlinePronunciation(text,requestId);return}
-  clearTimeout(speechStartTimer);let started=false;const utterance=new SpeechSynthesisUtterance(pronunciationText(text,true)),voice=preferredEnglishVoice(attempt);activeUtterance=utterance;speechSourceMode="system";utterance.lang=voice?.lang||"en-US";utterance.rate=.82;utterance.pitch=1;utterance.volume=1;utterance.voice=voice;
-  utterance.onstart=()=>{if(requestId!==speechRequestId)return;started=true;clearTimeout(speechStartTimer);updateSpeechButtons(text,"speaking")};
-  utterance.onend=()=>finishSpeech(requestId);
-  utterance.onerror=event=>{if(requestId!==speechRequestId||["canceled","interrupted"].includes(event.error))return;clearTimeout(speechStartTimer);synth.cancel();setTimeout(()=>beginSystemSpeech(text,requestId,attempt+1),120)};
-  try{if(synth.paused)synth.resume();synth.speak(utterance)}catch{synth.cancel();setTimeout(()=>beginSystemSpeech(text,requestId,attempt+1),120);return}
-  speechStartTimer=setTimeout(()=>{if(requestId!==speechRequestId||started)return;synth.cancel();beginSystemSpeech(text,requestId,attempt+1)},3500);
+  clearTimeout(speechStartTimer);let finished=false;const utterance=new SpeechSynthesisUtterance(pronunciationText(text,true)),voice=preferredEnglishVoice(attempt);activeUtterance=utterance;speechSourceMode="system";utterance.lang=voice?.lang||"en-US";utterance.rate=.82;utterance.pitch=1;utterance.volume=1;utterance.voice=voice;
+  const current=()=>!finished&&requestId===speechRequestId&&activeUtterance===utterance;
+  const tryNext=()=>{if(!current())return;finished=true;clearTimeout(speechStartTimer);releaseSpeechUtterance();synth.cancel();setTimeout(()=>beginSystemSpeech(text,requestId,attempt+1),120)};
+  utterance.onstart=()=>{if(!current())return;clearTimeout(speechStartTimer);updateSpeechButtons(text,"speaking");speechStartTimer=setTimeout(tryNext,30000)};
+  utterance.onend=()=>{if(!current())return;finished=true;finishSpeech(requestId)};
+  utterance.onerror=()=>tryNext();
+  speechStartTimer=setTimeout(tryNext,3500);
+  try{if(synth.paused)synth.resume();synth.speak(utterance)}catch{tryNext()}
 }
 async function speakWord(text){
-  if(!text)return;const requestId=++speechRequestId;if(activeSpeechText)updateSpeechButtons(activeSpeechText,"idle");stopActiveSpeech();activeSpeechText=text;updateSpeechButtons(text,"pending");
+  if(!text)return;stopActiveSpeech();const requestId=speechRequestId;activeSpeechText=text;updateSpeechButtons(text,"pending");
   await waitForEnglishVoices();if(requestId!==speechRequestId)return;
   if("speechSynthesis" in window&&"SpeechSynthesisUtterance" in window&&speechVoicePlan().length){setTimeout(()=>beginSystemSpeech(text,requestId),70)}else{playOnlinePronunciation(text,requestId)}
 }
@@ -386,23 +417,29 @@ async function initAuth(){
   renderAccountUI();if(!authSession)return;syncStatus="正在连接云端…";renderAccountUI();const valid=await ensureSession();if(valid)await syncProgress();else renderAccountUI()
 }
 const UPDATE_RELOAD_KEY="wordstep-update-target";
+let appUpdateDeferred=false;
+function deferAppUpdateForSession(){if(!session)return false;appUpdateDeferred=true;return true}
 async function checkForAppUpdate(){
-  if(session)return;
+  if(deferAppUpdateForSession())return;
+  appUpdateDeferred=false;
   try{
     const response=await fetch(`version.json?t=${Date.now()}`,{cache:"no-store"});if(!response.ok)return;
-    const remote=await response.json();if(!remote.version)return;
+    const remote=await response.json();if(deferAppUpdateForSession()||!remote.version)return;
     if(remote.version===APP_VERSION){sessionStorage.removeItem(UPDATE_RELOAD_KEY);return}
     if(sessionStorage.getItem(UPDATE_RELOAD_KEY)===remote.version)return;
-    sessionStorage.setItem(UPDATE_RELOAD_KEY,remote.version);
     const registration=await navigator.serviceWorker?.getRegistration();
+    if(deferAppUpdateForSession())return;
     await registration?.update();
+    if(deferAppUpdateForSession())return;
     let worker=registration?.waiting||registration?.installing;
     if(worker&&worker.state==="installing")await new Promise(resolve=>{const timeout=setTimeout(resolve,4000);worker.addEventListener("statechange",()=>{if(worker.state==="installed"){clearTimeout(timeout);resolve()}},{once:true})});
+    if(deferAppUpdateForSession())return;
     worker=registration?.waiting||worker;
     worker?.postMessage({type:"SKIP_WAITING"});
     if(navigator.serviceWorker?.controller&&worker)await Promise.race([new Promise(resolve=>navigator.serviceWorker.addEventListener("controllerchange",resolve,{once:true})),new Promise(resolve=>setTimeout(resolve,2500))]);
+    if(deferAppUpdateForSession())return;
     const url=new URL(location.href);url.searchParams.set("_wv",remote.version);
-    setTimeout(()=>location.replace(url.href),150);
+    setTimeout(()=>{if(deferAppUpdateForSession()||sessionStorage.getItem(UPDATE_RELOAD_KEY)===remote.version)return;sessionStorage.setItem(UPDATE_RELOAD_KEY,remote.version);location.replace(url.href)},150);
   }catch{}
 }
 
@@ -430,7 +467,7 @@ function renderDashboard(){
   document.querySelector("#new-progress").style.width=`${state.dailyGoal?learnedToday()/state.dailyGoal*100:0}%`;document.querySelector("#weak-progress").style.width=`${weak?Math.min(100,(activity.spelling||0)/weak*100):100}%`;
   renderWeek();
 }
-function renderWeek(){const box=document.querySelector("#week-chart");box.innerHTML="";let total=0;const labels=["日","一","二","三","四","五","六"];for(let i=6;i>=0;i--){const d=new Date(dayStart()-i*DAY),key=localDate(d),n=state.activity[key]?.completed||0;total+=n;box.insertAdjacentHTML("beforeend",`<div class="day-bar ${i===0?"today":""}"><div class="bar-track"><span class="bar-fill" style="height:${Math.min(100,Math.max(n?8:3,n*5))}%"></span></div><small>周${labels[d.getDay()]}</small></div>`)}document.querySelector("#week-total").textContent=`已练习 ${total} 词`}
+function renderWeek(){const box=document.querySelector("#week-chart");box.innerHTML="";let total=0;const labels=["日","一","二","三","四","五","六"];for(let i=6;i>=0;i--){const d=new Date(calendarDay(-i)),key=localDate(d),n=state.activity[key]?.completed||0;total+=n;box.insertAdjacentHTML("beforeend",`<div class="day-bar ${i===0?"today":""}"><div class="bar-track"><span class="bar-fill" style="height:${Math.min(100,Math.max(n?8:3,n*5))}%"></span></div><small>周${labels[d.getDay()]}</small></div>`)}document.querySelector("#week-total").textContent=`已练习 ${total} 词`}
 
 function renderLibrary(){
   document.querySelector("#category-filters").innerHTML=["全部",...categoryNames].map(c=>`<button class="filter-button ${c===activeCategory?"active":""}" data-category="${c}">${c}</button>`).join("");
@@ -447,7 +484,7 @@ function renderProgress(){
   document.querySelector("#stage-list").innerHTML=stages.map((x,i)=>`<div class="stage-row"><span>${x.n}</span><div class="stage-track"><div class="stage-fill" style="width:${counts[i]/max*100}%;opacity:${.55+i*.15}"></div></div><strong>${counts[i]}</strong></div>`).join("");
 }
 
-function switchView(name){document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id===`${name}-view`));document.querySelectorAll(".nav-item[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===name));if(name==="library")renderLibrary();if(name==="progress")renderProgress();window.scrollTo(0,0)}
+function switchView(name){stopActiveSpeech();document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id===`${name}-view`));document.querySelectorAll(".nav-item[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===name));if(name==="library")renderLibrary();if(name==="progress")renderProgress();window.scrollTo(0,0)}
 function shuffle(a){return [...a].sort(()=>Math.random()-.5)}
 function distractorWords(word){return shuffle(WORDS.filter(w=>w.id!==word.id&&w.en!==word.en&&w.category===word.category&&conciseMeaning(w.zh)!==conciseMeaning(word.zh))).slice(0,3)}
 function openSession(){
@@ -481,14 +518,46 @@ function finishWord(){
   const w=currentWord(),s=ws(w.id),wasNew=s.stage<0;let stage=s.stage;
   if(session.currentUnknown)stage=0;else if(session.currentHadError)stage=Math.max(0,stage-1);else stage=Math.min(STAGE_DAYS.length-1,stage+1);
   if(wasNew)stage=0;const unknownTotal=session.currentUnknown?(s.unknowns||0)+1:Math.max(0,(s.unknowns||0)-(session.currentHadError?0:1)),errorPenalty=Math.min(0.75,(s.errors+session.currentErrorCount)*.08+unknownTotal*.1),interval=Math.max(1,Math.round(STAGE_DAYS[stage]*(1-errorPenalty)));
-  const key=session.studyDate||localDate();state.words[w.id]={...s,stage,due:dayStart()+interval*DAY,errors:s.errors+session.currentErrorCount,unknowns:unknownTotal,correct:s.correct+(!session.currentHadError?1:0),seen:s.seen+1,lastSeen:key,learnedOn:s.learnedOn||(wasNew?key:null),modifiedAt:Date.now()};
+  const key=session.studyDate||localDate();state.words[w.id]={...s,stage,due:calendarDay(interval),errors:s.errors+session.currentErrorCount,unknowns:unknownTotal,correct:s.correct+(!session.currentHadError?1:0),seen:s.seen+1,lastSeen:key,learnedOn:s.learnedOn||(wasNew?key:null),modifiedAt:Date.now()};
   const a=state.activity[key]||{};state.activity[key]={completed:(a.completed||0)+1,reviews:(a.reviews||0)+(wasNew?0:1),new:(a.new||0)+(wasNew?1:0),spelling:(a.spelling||0)+1};state.lastStudyDate=key;saveState();
   session.idx++;session.phase="choice";session.currentHadError=false;session.currentErrorCount=0;session.currentUnknown=false;session.forceCorrection=false;if(session.idx>=session.queue.length)renderComplete();else renderQuestion();
 }
 function renderComplete(){document.querySelector("#session-progress-bar").style.width="100%";document.querySelector("#session-step").textContent="完成";document.querySelector("#study-card").innerHTML=`<div class="completion-icon">✓</div><span class="question-type">TODAY COMPLETE</span><h2 class="question-main chinese">今天的训练完成了！</h2><p class="question-note">记忆不靠一次记住，而靠每次及时回来。</p><div class="completion-stats"><div><strong>${session.queue.length}</strong><span>完成词数</span></div><div><strong>${session.correct}</strong><span>正确拼写</span></div><div><strong>${session.errors}</strong><span>纠正次数</span></div></div><button class="primary-button" id="finish-session">返回首页</button>`;document.querySelector("#finish-session").onclick=closeSession}
-function closeSession(){document.body.classList.remove("session-open");document.querySelector("#session-overlay").classList.remove("active");document.querySelector("#session-overlay").setAttribute("aria-hidden","true");session=null;renderDashboard();renderProgress()}
+function closeSession(){stopActiveSpeech();document.body.classList.remove("session-open");document.querySelector("#session-overlay").classList.remove("active");document.querySelector("#session-overlay").setAttribute("aria-hidden","true");session=null;renderDashboard();renderProgress();if(appUpdateDeferred)checkForAppUpdate()}
 function escapeAttr(s){return String(s).replaceAll("&","&amp;").replaceAll('"',"&quot;").replaceAll("'","&#39;").replaceAll("<","&lt;").replaceAll(">","&gt;")}
-function setModalOpen(selector,open){const modal=document.querySelector(selector);modal.classList.toggle("active",open);modal.setAttribute("aria-hidden",String(!open));if(open)setTimeout(()=>modal.querySelector("input,button")?.focus(),0)}
+const modalFocusStack=[],modalReturnFocus=new WeakMap();
+function topOpenModal(){return modalFocusStack.filter(modal=>modal.classList.contains("active")).at(-1)||null}
+function modalFocusTargets(modal){return [...modal.querySelectorAll('button,input:not([type="hidden"]),select,textarea,a[href],[tabindex]')].filter(element=>!element.disabled&&element.tabIndex>=0&&!element.closest('[hidden],[inert],[aria-hidden="true"]')&&element.getClientRects().length>0)}
+function focusModal(modal){(modalFocusTargets(modal)[0]||modal.querySelector('[role="dialog"]')||modal).focus({preventScroll:true})}
+function canRestoreModalFocus(element){return element?.isConnected&&!element.disabled&&!element.closest('[hidden],[inert],[aria-hidden="true"]')&&element.getClientRects().length>0}
+function setModalOpen(selector,open){
+  const modal=document.querySelector(selector);if(!modal)return;
+  const wasOpen=modal.classList.contains("active"),wasTop=topOpenModal()===modal;
+  if(open){
+    if(!wasOpen){modalReturnFocus.set(modal,document.activeElement);modalFocusStack.push(modal)}
+    modal.classList.add("active");modalFocusStack.forEach((item,index)=>{item.style.zIndex=String(30+index)});modal.setAttribute("aria-hidden","false");
+    setTimeout(()=>{if(topOpenModal()===modal&&!modal.contains(document.activeElement))focusModal(modal)},0);
+  }else{
+    const index=modalFocusStack.indexOf(modal);if(index>=0)modalFocusStack.splice(index,1);
+    modal.classList.remove("active");modal.style.removeProperty("z-index");modalFocusStack.forEach((item,index)=>{item.style.zIndex=String(30+index)});
+    if(wasOpen&&(wasTop||modal.contains(document.activeElement))){
+      const top=topOpenModal(),previous=modalReturnFocus.get(modal);
+      if(canRestoreModalFocus(previous)&&(!top||top.contains(previous)))previous.focus({preventScroll:true});
+      else if(top)focusModal(top);
+      else [...document.querySelectorAll('.nav-item.active,#close-session')].find(canRestoreModalFocus)?.focus({preventScroll:true});
+    }
+    modal.setAttribute("aria-hidden","true");modalReturnFocus.delete(modal);
+  }
+}
+document.addEventListener("keydown",event=>{
+  const modal=topOpenModal();if(!modal)return;
+  if(event.key==="Escape"){event.preventDefault();event.stopImmediatePropagation();setModalOpen(`#${modal.id}`,false);return}
+  if(event.key!=="Tab")return;
+  const targets=modalFocusTargets(modal),first=targets[0],last=targets.at(-1),active=document.activeElement;
+  if(!first){event.preventDefault();focusModal(modal)}
+  else if(!modal.contains(active)||event.shiftKey&&active===first||!event.shiftKey&&active===last){event.preventDefault();(event.shiftKey?last:first).focus()}
+},true);
+document.addEventListener("focusin",event=>{const modal=topOpenModal();if(modal&&!modal.contains(event.target))focusModal(modal)});
 
 document.querySelectorAll(".nav-item[data-view]").forEach(b=>b.addEventListener("click",()=>switchView(b.dataset.view)));
 document.querySelectorAll('[data-action="open-settings"]').forEach(b=>b.addEventListener("click",()=>{document.querySelector("#daily-range").value=state.dailyGoal;updateRange();setModalOpen("#settings-modal",true)}));
@@ -502,11 +571,16 @@ document.querySelector("#start-session").onclick=openSession;document.querySelec
 document.querySelector("#word-search").addEventListener("input",()=>{libraryLimit=100;renderLibrary()});document.querySelector("#category-filters").addEventListener("click",e=>{if(e.target.dataset.category){activeCategory=e.target.dataset.category;libraryLimit=100;renderLibrary()}});
 document.querySelector("#word-list").addEventListener("click",e=>{if(e.target.id==="load-more"){libraryLimit+=100;renderLibrary()}});
 document.addEventListener("click",e=>{const button=e.target.closest("[data-speak]");if(button){e.preventDefault();e.stopPropagation();speakWord(button.dataset.speak)}});
-document.addEventListener("keydown",e=>{if(e.key!=="Enter"||e.repeat||!session||e.target.closest?.("[data-favorite-id], [data-reveal-id]")||!document.querySelector("#session-overlay").classList.contains("active"))return;const next=document.querySelector("#next-word")||document.querySelector("#to-spelling")||document.querySelector("#finish-session");if(next){e.preventDefault();next.click()}});
+document.addEventListener("keydown",e=>{if(e.key!=="Enter"||e.repeat||!session||document.querySelector(".modal-backdrop.active")||e.target.closest?.("[data-favorite-id], [data-reveal-id], [data-speak]")||!document.querySelector("#session-overlay").classList.contains("active"))return;const next=document.querySelector("#next-word")||document.querySelector("#to-spelling")||document.querySelector("#finish-session");if(next){e.preventDefault();next.click()}});
 document.addEventListener("keydown",e=>{if(e.key!=="Escape")return;if(document.querySelector("#auth-modal").classList.contains("active"))setModalOpen("#auth-modal",false);else if(document.querySelector("#settings-modal").classList.contains("active"))setModalOpen("#settings-modal",false)});
 document.querySelector("#settings-modal").addEventListener("click",e=>{if(e.target.id==="settings-modal")setModalOpen("#settings-modal",false)});
 document.querySelector("#auth-modal").addEventListener("click",e=>{if(e.target.id==="auth-modal")setModalOpen("#auth-modal",false)});
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){refreshEnglishVoices();if(authSession)syncProgress();checkForAppUpdate()}else{stopActiveSpeech();finishSpeech(speechRequestId)}});
 window.addEventListener("online",()=>{if(authSession)syncProgress()});
+window.addEventListener("storage",event=>{
+  if(!window.WordStepEnhancements)return;
+  if(event.key!==progressStorageKey()||!event.newValue)return;
+  try{if(!adoptStoredProgress(JSON.parse(event.newValue)))return;persistLocalState();renderDashboard();renderLibrary();renderProgress();if(authSession)scheduleCloudSync()}catch(error){console.warn("Ignored invalid progress update from another tab",error)}
+});
 
 document.addEventListener("DOMContentLoaded",()=>verifyContentBundle().then(valid=>{if(valid){renderDashboard();renderLibrary();renderProgress();initAuth();checkForAppUpdate()}}),{once:true});

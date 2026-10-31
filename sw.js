@@ -1,6 +1,6 @@
-const CACHE_NAME="wordstep-20261016-1";
+const CACHE_NAME="wordstep-20261029-1";
 const VOCABULARY_VERSION="20261015-1";
-const SHELL=["./","./index.html","./styles.css","./app-20261016-1.js","./enhancements-20261016-1.js","./sync-model-20261016-1.js","./favorites-20261016-1.js","./favorites-20261016-1.css","./manifest.webmanifest","./icon.svg","./icon-32.png","./icon-192.png","./icon-512.png","./icon-maskable-512.png","./apple-touch-icon.png","./version.json"];
+const SHELL=["./","./index.html","./styles.css","./app-20261029-1.js","./enhancements-20261029-1.js","./sync-model-20261029-1.js","./favorites-20261029-1.js","./favorites-20261029-1.css","./manifest.webmanifest","./icon.svg","./icon-32.png","./icon-192.png","./icon-512.png","./icon-maskable-512.png","./apple-touch-icon.png","./version.json"];
 const DATA=["./compact-words-20261015-1.js"];
 const NAVIGATION_TIMEOUT=2200;
 self.addEventListener("install",event=>event.waitUntil(caches.open(CACHE_NAME).then(async cache=>{

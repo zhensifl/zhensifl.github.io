@@ -16,7 +16,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="WordStep" />
   <link rel="stylesheet" href="styles.css?v=20261015-1" />
-  <link rel="stylesheet" href="favorites-20261016-1.css" />
+  <link rel="stylesheet" href="favorites-20261029-1.css" />
 </head>
 <body>
   <div class="app-shell">
@@ -145,9 +145,9 @@
   </div>
 
   <div class="modal-backdrop" id="settings-modal" aria-hidden="true">
-    <div class="modal">
-      <button class="modal-close" data-action="close-settings">×</button>
-      <span class="eyebrow">LEARNING SETTINGS</span><h2>学习设置</h2><p>选择一个可以长期坚持的节奏，比一次学很多更重要。</p>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settings-title" tabindex="-1">
+      <button class="modal-close" data-action="close-settings" aria-label="关闭学习设置">×</button>
+      <span class="eyebrow">LEARNING SETTINGS</span><h2 id="settings-title">学习设置</h2><p>选择一个可以长期坚持的节奏，比一次学很多更重要。</p>
       <label class="range-label" for="daily-range"><span>每日新词数量</span><strong><span id="daily-value">10</span> 词</strong></label>
       <input type="range" id="daily-range" min="5" max="70" step="5" value="10">
       <div class="range-marks"><span>5</span><span>20</span><span>30</span><span>40</span><span>55</span><span>70</span></div>
@@ -173,14 +173,14 @@
   </div>
 
   <div class="modal-backdrop" id="auth-modal" aria-hidden="true">
-    <div class="modal auth-modal-card">
+    <div class="modal auth-modal-card" role="dialog" aria-modal="true" aria-label="账号登录与云端同步" tabindex="-1">
       <button class="modal-close" data-action="close-auth" aria-label="关闭">×</button>
       <div id="auth-content"></div>
     </div>
   </div>
 
   <div class="modal-backdrop" id="placement-modal" aria-hidden="true">
-    <div class="modal placement-modal-card">
+    <div class="modal placement-modal-card" role="dialog" aria-modal="true" aria-label="英语词汇水平测试" tabindex="-1">
       <button class="modal-close" data-action="close-placement" aria-label="关闭">×</button>
       <div id="placement-content"></div>
     </div>
@@ -188,9 +188,9 @@
 
   <div class="toast" id="toast"></div>
   <script src="compact-words-20261015-1.js?v=20261015-1"></script>
-  <script src="app-20261016-1.js"></script>
-  <script src="sync-model-20261016-1.js"></script>
-  <script src="enhancements-20261016-1.js"></script>
-  <script src="favorites-20261016-1.js"></script>
+  <script src="app-20261029-1.js"></script>
+  <script src="sync-model-20261029-1.js"></script>
+  <script src="enhancements-20261029-1.js"></script>
+  <script src="favorites-20261029-1.js"></script>
 </body>
 </html>

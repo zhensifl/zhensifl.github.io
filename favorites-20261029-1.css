@@ -1,0 +1,57 @@
+/* Personal word collection, using WordStep's existing purple palette. */
+.favorites-toolbar{display:flex;align-items:center;gap:18px;justify-content:space-between;margin-bottom:12px}
+.favorites-toolbar .search-box{display:flex;align-items:center;gap:10px;flex:1;min-width:0;max-width:540px;margin:0}
+.favorites-toolbar .search-box input{width:100%;min-width:0;padding:3px 0}
+.favorites-count{display:flex;align-items:baseline;gap:7px;white-space:nowrap;color:var(--muted);font-size:12px}
+.favorites-count strong{color:var(--green);font-size:27px}
+.favorites-status{font-size:12px;line-height:1.6;color:var(--muted);margin:0 0 20px}
+.favorite-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+.favorite-card{min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:20px;box-shadow:0 4px 16px rgba(74,40,126,.035)}
+.favorite-card-header{display:flex;align-items:flex-start;gap:14px;justify-content:space-between}
+.favorite-word{border:0;background:transparent;padding:0;min-width:0;flex:1;text-align:left;cursor:pointer;border-radius:8px}
+.favorite-word strong{display:block;font-size:25px;line-height:1.25;overflow-wrap:anywhere;color:var(--ink);letter-spacing:-.5px}
+.favorite-word .phonetic{display:block;font-size:12px;line-height:1.6;margin-top:7px;overflow-wrap:anywhere;color:#756d80}
+.favorite-reveal-label{display:block;margin-top:12px;font-size:11px;color:var(--green)}
+.favorite-card-actions{display:flex;gap:7px;align-items:center;flex-shrink:0}
+.favorite-button{display:inline-flex;align-items:center;justify-content:center;gap:5px;border:1px solid #dcd2ee;background:#faf8ff;color:#74579e;border-radius:11px;padding:8px 11px;min-height:44px;font-size:12px;cursor:pointer;flex-shrink:0;line-height:1.2}
+.favorite-star{font-size:22px;line-height:1}
+.favorite-button.is-saved{color:#6d28d9;background:#eee5ff;border-color:#c6afe9}
+.favorite-button:hover{background:#f0e9fc;border-color:#ac8dd7}
+.favorite-button.compact{width:44px;height:44px;padding:0;border-radius:50%}
+.favorite-button.compact .favorite-button-label{display:none}
+.favorite-card-actions .speak-button{width:44px;height:44px;font-size:20px}
+.favorite-word:focus-visible,.favorite-button:focus-visible{outline:3px solid #a788d9;outline-offset:4px}
+.favorite-meaning{margin-top:18px;border-top:1px solid var(--line);padding-top:16px;text-align:left;overflow-wrap:anywhere}
+.favorite-meaning[hidden],#favorites-load-more[hidden]{display:none!important}
+.favorite-meaning>p{font-size:15px;line-height:1.7;margin:0;color:var(--green);font-weight:600}
+.favorite-example{margin-top:11px;padding:12px;border-radius:12px;background:#f8f5fd;line-height:1.7;font-size:12px}
+.favorite-example span,.favorite-example small{display:block}
+.favorite-example small{color:var(--muted);font-size:11px;margin-top:4px}
+.favorites-empty{grid-column:1/-1;text-align:center;padding:48px 18px;border:1px dashed #d7c9eb;border-radius:22px;background:#fbf9ff;color:var(--muted)}
+.favorites-empty>span{font-size:44px;color:#9370cc}
+.favorites-empty h2{font-size:20px;color:var(--ink);margin:15px 0 10px}
+.favorites-empty p{font-size:13px;line-height:1.7;margin:0 0 20px}
+#favorites-load-more{border:1px solid var(--line);border-radius:14px;margin-top:18px;background:#f9f6ff}
+.word-row-actions{display:flex;align-items:flex-end;flex-direction:column;gap:8px;justify-self:end}
+.word-row-actions .status-badge{white-space:nowrap}
+.word-en{min-width:0}
+.word-title{flex-wrap:wrap}
+.word-title strong{overflow-wrap:anywhere}
+.study-tools{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:-10px 0 6px;text-align:left}
+.study-tools .question-type{flex:1;line-height:1.6}
+.study-favorite-button{font-size:11px;min-height:44px}
+@media(max-width:960px){.favorite-grid{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){#favorites-view{animation:none}}
+@media(max-width:680px){
+  .mobile-nav .nav-item{min-width:0;flex:1;padding:5px 6px}
+  .favorites-toolbar{gap:12px}
+  .favorites-count{gap:4px;font-size:11px}
+  .favorites-count strong{font-size:23px}
+  .favorite-card{padding:18px;border-radius:18px}
+  .favorite-card-header{gap:10px}
+  .favorite-word strong{font-size:23px}
+  .favorite-card-actions{gap:5px}
+  .word-row{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) auto;gap:10px}
+  .word-zh{overflow-wrap:anywhere}
+  .study-tools{gap:8px;margin-top:-5px}
+}

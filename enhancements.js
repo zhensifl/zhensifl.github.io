@@ -62,9 +62,7 @@ function migrateLegacyMemoryState(source={}){
   return {state:migrated,changed};
 }
 {
-  const migration=migrateLegacyMemoryState(state);
-  state=migration.state;
-  if(migration.changed){state.updatedAt=Date.now();persistLocalState()}
+  /* Initial persistence is deferred until the enhanced merge model is ready. */
 }
 
 const CURATED_CEFR_LEVELS={
@@ -102,11 +100,12 @@ ws=id=>enhancedRecord(id);
 
 mergeProgress=(local,cloud)=>{
   const a=migrateLegacyMemoryState(local||{}).state,b=migrateLegacyMemoryState(cloud||{}).state;
-  const merged={...defaultState,words:{},activity:{},favorites:mergeFavorites(a.favorites,b.favorites),settingClocks:{},settingsBaselineAt:Math.max(a.settingsBaselineAt||0,b.settingsBaselineAt||0),memoryModelVersion:MEMORY_MODEL_VERSION,lastStudyDate:[a.lastStudyDate,b.lastStudyDate].filter(Boolean).sort().pop()||null,updatedAt:Math.max(a.updatedAt||0,b.updatedAt||0)};
-  WORDSTEP_SETTINGS.forEach(key=>{merged[key]=mergeSetting(a,b,key,defaultState[key]);if(a.settingClocks?.[key]!==undefined||b.settingClocks?.[key]!==undefined)merged.settingClocks[key]=Math.max(Number(a.settingClocks?.[key])||0,Number(b.settingClocks?.[key])||0)});
-  if(a.placementDone||b.placementDone){merged.placementDone=true;merged.settingClocks.placementDone=Math.max(Number(a.settingClocks?.placementDone)||0,Number(b.settingClocks?.placementDone)||0)}
-  new Set([...Object.keys(a.words),...Object.keys(b.words)]).forEach(id=>{const left=a.words[id],right=b.words[id];merged.words[id]=!left?right:!right?left:wordRecordScore(right)>wordRecordScore(left)?right:left});
-  new Set([...Object.keys(a.activity),...Object.keys(b.activity)]).forEach(day=>{merged.activity[day]=mergeActivity(a.activity[day],b.activity[day],a.words,b.words,day)});
+  const order=compareProgressEpoch(a,b),leftState=order<0?b:a,rightState=order>0?a:b;
+  const merged={...defaultState,words:{},activity:{},favorites:mergeFavorites(a.favorites,b.favorites),progressEpoch:normalizeProgressEpoch(leftState.progressEpoch),settingClocks:{},settingsBaselineAt:Math.max(leftState.settingsBaselineAt||0,rightState.settingsBaselineAt||0),memoryModelVersion:MEMORY_MODEL_VERSION,lastStudyDate:[leftState.lastStudyDate,rightState.lastStudyDate].filter(Boolean).sort().pop()||null,updatedAt:Math.max(a.updatedAt||0,b.updatedAt||0)};
+  WORDSTEP_SETTINGS.forEach(key=>{merged[key]=mergeSetting(leftState,rightState,key,defaultState[key]);if(leftState.settingClocks?.[key]!==undefined||rightState.settingClocks?.[key]!==undefined)merged.settingClocks[key]=Math.max(Number(leftState.settingClocks?.[key])||0,Number(rightState.settingClocks?.[key])||0)});
+  if(leftState.placementDone||rightState.placementDone){merged.placementDone=true;merged.settingClocks.placementDone=Math.max(Number(leftState.settingClocks?.placementDone)||0,Number(rightState.settingClocks?.placementDone)||0)}
+  new Set([...Object.keys(leftState.words),...Object.keys(rightState.words)]).forEach(id=>{const left=leftState.words[id],right=rightState.words[id];merged.words[id]=!left?right:!right?left:wordRecordScore(right)>wordRecordScore(left)?right:left});
+  new Set([...Object.keys(leftState.activity),...Object.keys(rightState.activity)]).forEach(day=>{merged.activity[day]=mergeActivity(leftState.activity[day],rightState.activity[day],leftState.words,rightState.words,day)});
   return merged;
 };
 
@@ -190,7 +189,7 @@ function renderPlacementResult(level){
 }
 function finishPlacement(level){
   const previous={...state},now=Date.now(),exact=new Set(placement.knownIds||[]),strongA2=(placement.answers||[]).slice(0,4).filter(Boolean).length>=3;
-  WORDS.filter(word=>exact.has(word.id)||(strongA2&&word.isEssential)).forEach(word=>{if(ws(word.id).stage>=0)return;const confirmed=exact.has(word.id),stability=confirmed?30:7;state.words[word.id]={...ws(word.id),stage:confirmed?4:2,due:dayStart()+stability*DAY,stability,difficulty:confirmed?3:4,lastSeen:localDate(),learnedOn:null,lastReviewAt:now,lastRating:"easy",seen:1,correct:1,modifiedAt:now,placementKnown:true}});
+  WORDS.filter(word=>exact.has(word.id)||(strongA2&&word.isEssential)).forEach(word=>{if(ws(word.id).stage>=0)return;const confirmed=exact.has(word.id),stability=confirmed?30:7;state.words[word.id]={...ws(word.id),stage:confirmed?4:2,due:calendarDay(stability),stability,difficulty:confirmed?3:4,lastSeen:localDate(),learnedOn:null,lastReviewAt:now,lastRating:"easy",seen:1,correct:1,modifiedAt:now,placementKnown:true}});
   state.level=level;state.placementDone=true;rememberPlacementCompletion();saveChangedSettings(previous);setModalOpen("#placement-modal",false);populateEnhancedSettings();renderDashboard();renderLibrary();renderProgress();showToast(`已切换到 ${level}，以后只会在你主动重新测试时出现`)
 }
 
@@ -203,14 +202,18 @@ openSession=()=>{
 };
 document.querySelector("#start-session").onclick=openSession;
 
+function queueQuestionSpeech(word,phase){
+  const owner=session,index=session.idx,requestId=speechRequestId;
+  setTimeout(()=>{if(session===owner&&session.idx===index&&session.phase===phase&&requestId===speechRequestId&&!document.hidden)speakWord(word.en)},100);
+}
 renderQuestion=()=>{
-  const word=currentWord(),progress=session.idx/session.queue.length*100;document.querySelector("#session-progress-bar").style.width=`${progress}%`;document.querySelector("#session-step").textContent=`${session.idx+1} / ${session.queue.length}`;
+  stopActiveSpeech();const word=currentWord(),progress=session.idx/session.queue.length*100;document.querySelector("#session-progress-bar").style.width=`${progress}%`;document.querySelector("#session-step").textContent=`${session.idx+1} / ${session.queue.length}`;
   if(session.phase!=="choice"){renderSpelling();return}
   const mode=modeForQuestion();session.currentQuestionType=mode;
   if(mode==="dictation"){session.phase="spelling";renderSpelling();return}
   if(mode==="listening"){
     const options=shuffle([word,...distractorWords(word)]);document.querySelector("#study-card").innerHTML=`<span class="question-type">LISTENING · 听音辨义</span><div class="listening-prompt"><button class="speak-button large" data-speak="${escapeAttr(word.en)}" aria-label="播放单词发音">🔊</button><span class="mode-chip">听发音，选择正确中文</span></div><div class="choice-grid">${options.map(option=>`<button class="choice meaning-choice" data-answer="${option.id}"><span class="choice-pos">${escapeAttr(option.pos)}</span><span>${escapeAttr(primaryMeaning(option))}</span></button>`).join("")}</div><div class="choice-unknown-wrap"><button class="unknown-button" id="choice-unknown" type="button">没听出来</button></div><div id="choice-feedback"></div>`;
-    document.querySelectorAll(".choice").forEach(button=>button.addEventListener("click",()=>answerChoice(button,String(word.id),`${word.en} · ${meaningWithPartOfSpeech(word)}`,word.en,word.phonetic)));document.querySelector("#choice-unknown").onclick=()=>markChoiceUnknown(String(word.id),`${word.en} · ${meaningWithPartOfSpeech(word)}`,word.en,word.phonetic);session.listening++;setTimeout(()=>{if(session&&currentWord()?.id===word.id)speakWord(word.en)},100);return;
+    document.querySelectorAll(".choice").forEach(button=>button.addEventListener("click",()=>answerChoice(button,String(word.id),`${word.en} · ${meaningWithPartOfSpeech(word)}`,word.en,word.phonetic)));document.querySelector("#choice-unknown").onclick=()=>markChoiceUnknown(String(word.id),`${word.en} · ${meaningWithPartOfSpeech(word)}`,word.en,word.phonetic);session.listening++;queueQuestionSpeech(word,"choice");return;
   }
   const reverse=(word.id+session.idx)%2===0,field=reverse?"en":"zh",question=reverse?meaningWithPartOfSpeech(word):word.en,options=shuffle([word,...distractorWords(word)]),correctLabel=field==="zh"?meaningWithPartOfSpeech(word):word.en;
   document.querySelector("#study-card").innerHTML=`<span class="question-type">${reverse?"中文 → 英文":"英文 → 中文"}</span><div class="question-word-row"><h2 class="question-main ${reverse?"chinese":""}">${escapeAttr(question)}</h2>${reverse?"":`<button class="speak-button large" data-speak="${escapeAttr(word.en)}" aria-label="朗读 ${escapeAttr(word.en)}">🔊</button>`}</div>${reverse?"":`<span class="phonetic">${escapeAttr(word.phonetic)}</span>`}<p class="question-note">选择正确含义，然后完成拼写</p><div class="choice-grid">${options.map(option=>field==="zh"?`<button class="choice meaning-choice" data-answer="${option.id}"><span class="choice-pos">${escapeAttr(option.pos)}</span><span>${escapeAttr(primaryMeaning(option))}</span></button>`:`<button class="choice" data-answer="${option.id}">${escapeAttr(option.en)}</button>`).join("")}</div><div class="choice-unknown-wrap"><button class="unknown-button" id="choice-unknown" type="button">不认识这个词</button></div><div id="choice-feedback"></div>`;
@@ -222,9 +225,9 @@ choiceFeedback=({correct,answer,speakText,phonetic,unknown=false})=>{
 };
 
 renderSpelling=()=>{
-  const word=currentWord(),example=clozeExample(word),dictation=session.currentQuestionType==="dictation";
+  stopActiveSpeech();const word=currentWord(),example=clozeExample(word),dictation=session.currentQuestionType==="dictation";
   document.querySelector("#study-card").innerHTML=`<span class="question-type">${dictation?"DICTATION · 听写强化":"拼写练习 · 必须拼对才能继续"}</span>${dictation?`<div class="listening-prompt"><button class="speak-button large" data-speak="${escapeAttr(word.en)}" aria-label="播放单词发音">🔊</button><span class="mode-chip">听发音并拼写</span></div>`:`<h2 class="question-main chinese">${escapeAttr(primaryMeaning(word))}</h2><span class="phonetic">${escapeAttr(word.phonetic)}</span>`}<div class="spelling-example"><span>${example.kind==="definition"?"语境释义":"例句"}</span><p>${escapeAttr(example.en)}</p><small>${escapeAttr(example.zh)}</small></div>${phraseHintHtml(word,true)}<form class="spell-form" id="spell-form"><input class="spell-input" id="spell-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="输入英文单词" aria-label="输入英文拼写"><div class="spell-actions"><button class="primary-button" type="submit">检查拼写</button><button class="unknown-button" id="spell-unknown" type="button">不认识</button></div><div id="spell-feedback" aria-live="polite"></div></form>`;
-  const input=document.querySelector("#spell-input");input.placeholder=word.en.includes(" ")?"输入英文短语":"输入英文单词";input.focus();document.querySelector("#spell-form").onsubmit=event=>{event.preventDefault();checkSpelling(input.value)};document.querySelector("#spell-unknown").onclick=markSpellingUnknown;if(dictation){session.listening++;setTimeout(()=>{if(session&&currentWord()?.id===word.id)speakWord(word.en)},100)}
+  const input=document.querySelector("#spell-input");input.placeholder=word.en.includes(" ")?"输入英文短语":"输入英文单词";input.focus();document.querySelector("#spell-form").onsubmit=event=>{event.preventDefault();checkSpelling(input.value)};document.querySelector("#spell-unknown").onclick=markSpellingUnknown;if(dictation){session.listening++;queueQuestionSpeech(word,"spelling")}
 };
 
 checkSpelling=value=>{
@@ -235,9 +238,11 @@ checkSpelling=value=>{
 };
 
 finishWord=(rating="good")=>{
+  const owningSession=session;if(!owningSession)return;
   const word=currentWord(),record=ws(word.id),wasNew=record.stage<0,schedule=nextSchedule(record,rating,wasNew),unknownTotal=session.currentUnknown?(record.unknowns||0)+1:Math.max(0,(record.unknowns||0)-(session.currentHadError?0:1));
-  const key=session.studyDate||localDate();recordActivity(state,key,ACTIVITY_ACTOR,word.id,wasNew,session.currentHadError,session.currentErrorCount,["listening","dictation"].includes(session.currentQuestionType),rating);state.words[word.id]={...record,stage:memoryStage(schedule.stability),due:dayStart()+schedule.interval*DAY,errors:(record.errors||0)+session.currentErrorCount,unknowns:unknownTotal,correct:(record.correct||0)+(!session.currentHadError?1:0),seen:(record.seen||0)+1,lastSeen:key,learnedOn:record.learnedOn||(wasNew?key:null),stability:schedule.stability,difficulty:schedule.difficulty,lapses:(record.lapses||0)+(rating==="again"?1:0),lastReviewAt:Date.now(),lastRating:rating,modifiedAt:Date.now()};
+  const key=session.studyDate||localDate();recordActivity(state,key,ACTIVITY_ACTOR,word.id,wasNew,session.currentHadError,session.currentErrorCount,["listening","dictation"].includes(session.currentQuestionType),rating);state.words[word.id]={...record,stage:memoryStage(schedule.stability),due:calendarDay(schedule.interval),errors:(record.errors||0)+session.currentErrorCount,unknowns:unknownTotal,correct:(record.correct||0)+(!session.currentHadError?1:0),seen:(record.seen||0)+1,lastSeen:key,learnedOn:record.learnedOn||(wasNew?key:null),stability:schedule.stability,difficulty:schedule.difficulty,lapses:(record.lapses||0)+(rating==="again"?1:0),lastReviewAt:Date.now(),lastRating:rating,modifiedAt:Date.now()};
   state.lastStudyDate=key;saveState();
+  if(session!==owningSession)return;
   session.correctWords=(session.correctWords||0)+(!session.currentHadError?1:0);session.idx++;session.phase="choice";session.currentHadError=false;session.currentErrorCount=0;session.currentUnknown=false;session.forceCorrection=false;session.currentQuestionType=null;if(session.idx>=session.queue.length)renderComplete();else renderQuestion();
 };
 
@@ -264,9 +269,9 @@ renderLibrary=()=>{
   document.querySelector("#word-list").innerHTML=filtered.length?visible.map(word=>{const record=ws(word.id),example=exampleFor(word),status=record.stage<0?["未学习",""]:record.stability>=30?["已掌握","mastered"]:["学习中","learning"];return `<div class="word-row"><div class="word-en"><div class="word-title"><strong>${escapeAttr(word.en)}</strong><span class="level-badge">${word.level}</span><button class="speak-button" data-speak="${escapeAttr(word.en)}" aria-label="朗读 ${escapeAttr(word.en)}">🔊</button></div><small>${escapeAttr(word.phonetic)}</small></div><div class="word-zh">${escapeAttr(word.zh)}</div><div class="word-example">${escapeAttr(example.en)}<br><small>${escapeAttr(example.zh)}</small></div><span class="status-badge ${status[1]}">${status[0]}</span></div>`}).join("")+`${visible.length<filtered.length?`<button class="load-more" id="load-more">继续显示 ${Math.min(100,filtered.length-visible.length)} 个（当前 ${visible.length} / 共 ${filtered.length}）</button>`:""}`:`<div class="empty-state">没有找到匹配的单词</div>`;
 };
 
-function recentActivity(days=7){const rows=[];for(let index=0;index<days;index++){const date=new Date(dayStart()-index*DAY);rows.push(state.activity[localDate(date)]||{})}return rows}
+function recentActivity(days=7){const rows=[];for(let index=0;index<days;index++){const date=new Date(calendarDay(-index));rows.push(state.activity[localDate(date)]||{})}return rows}
 renderProgress=()=>{
-  const learned=WORDS.filter(word=>ws(word.id).stage>=0),mastered=learned.filter(word=>ws(word.id).stability>=30),practiced=Object.values(state.activity).reduce((sum,item)=>sum+(item.completed||0),0),known=learned.filter(word=>ws(word.id).stability>=7&&retrievability(ws(word.id))>=.8).length,tomorrow=dayStart()+DAY,dueTomorrow=learned.filter(word=>ws(word.id).due>dayStart()&&ws(word.id).due<=tomorrow).length,recent=recentActivity(),measured=recent.filter(item=>Number(item.attempts)>0&&Number.isFinite(Number(item.correct))),attempts=measured.reduce((sum,item)=>sum+Number(item.attempts),0),correct=measured.reduce((sum,item)=>sum+Math.min(Number(item.attempts),Math.max(0,Number(item.correct))),0),accuracy=attempts?Math.round(correct/attempts*100):null;
+  const learned=WORDS.filter(word=>ws(word.id).stage>=0),mastered=learned.filter(word=>ws(word.id).stability>=30),practiced=Object.values(state.activity).reduce((sum,item)=>sum+(item.completed||0),0),known=learned.filter(word=>ws(word.id).stability>=7&&retrievability(ws(word.id))>=.8).length,tomorrow=calendarDay(1),dueTomorrow=learned.filter(word=>ws(word.id).due>dayStart()&&ws(word.id).due<=tomorrow).length,recent=recentActivity(),measured=recent.filter(item=>Number(item.attempts)>0&&Number.isFinite(Number(item.correct))),attempts=measured.reduce((sum,item)=>sum+Number(item.attempts),0),correct=measured.reduce((sum,item)=>sum+Math.min(Number(item.attempts),Math.max(0,Number(item.correct))),0),accuracy=attempts?Math.round(correct/attempts*100):null;
   document.querySelector("#progress-stats").innerHTML=[[learned.length,"已学习词汇",`${state.level} 当前等级`],[mastered.length,"长期掌握","稳定度 ≥ 30 天"],[streak(),"连续学习","天"],[practiced,"累计练习","次"]].map(item=>`<article class="big-stat"><span>${item[1]}</span><strong>${item[0]}</strong><small>${item[2]}</small></article>`).join("");document.querySelector("#insight-grid").innerHTML=`<article class="insight-card"><span>预计可用词汇量</span><strong>${known}</strong><small>当前记忆概率 ≥ 80%</small></article><article class="insight-card"><span>近 7 天正确率</span><strong>${accuracy===null?"—":`${accuracy}%`}</strong><small>${accuracy===null?"旧记录未保存正确次数，将从新版练习开始统计":`${attempts} 次有效练习`}</small></article><article class="insight-card"><span>明日预计复习</span><strong>${dueTomorrow}</strong><small>会根据今天表现动态变化</small></article>`;
   const stages=[{name:"初次接触",min:0,max:1.49},{name:"正在记住",min:1.5,max:6.99},{name:"逐渐稳定",min:7,max:29.99},{name:"长期掌握",min:30,max:Infinity}],counts=stages.map(stage=>learned.filter(word=>{const value=ws(word.id).stability||0;return value>=stage.min&&value<=stage.max}).length),max=Math.max(1,...counts);document.querySelector("#stage-list").innerHTML=stages.map((stage,index)=>`<div class="stage-row"><span>${stage.name}</span><div class="stage-track"><div class="stage-fill" style="width:${counts[index]/max*100}%;opacity:${.6+index*.12}"></div></div><strong>${counts[index]}</strong></div>`).join("");
   const scenes=categoryNames.map(category=>{const words=WORDS.filter(word=>word.category===category),done=words.filter(word=>ws(word.id).stage>=0).length;return {category,percent:Math.round(done/words.length*100)}}).sort((a,b)=>b.percent-a.percent);document.querySelector("#scene-mastery").innerHTML=scenes.map(scene=>`<div class="scene-row"><span>${scene.category}</span><div class="scene-track"><span style="width:${scene.percent}%"></span></div><strong>${scene.percent}%</strong></div>`).join("");const weak=weakWords().slice(0,8);document.querySelector("#weak-word-list").innerHTML=weak.length?weak.map(word=>`<div class="weak-word"><strong>${escapeAttr(word.en)}</strong><span>${RATING_LABELS[ws(word.id).lastRating]||"需要巩固"} · ${Math.round(retrievability(ws(word.id))*100)}%</span></div>`).join(""):`<div class="empty-state">暂时没有易错词</div>`;
@@ -300,25 +305,36 @@ async function requestPasswordReset(){const email=document.querySelector("#auth-
 async function consumeRecoveryLink(){const params=new URLSearchParams(location.hash.slice(1));if(params.get("type")!=="recovery"||!params.get("access_token"))return false;try{const user=await supabaseRequest("/auth/v1/user",{token:params.get("access_token")});activateAccount({access_token:params.get("access_token"),refresh_token:params.get("refresh_token"),expires_at:Math.floor(Date.now()/1000)+Number(params.get("expires_in")||3600),user});authMode="recovery";history.replaceState(null,"",location.pathname+location.search);renderAuthModal();setModalOpen("#auth-modal",true);return true}catch(error){authMessage=authErrorText(error.message);return false}}
 async function updateRecoveredPassword(event){event.preventDefault();const password=document.querySelector("#recovery-password").value,button=event.submitter;button.disabled=true;try{await supabaseRequest("/auth/v1/user",{method:"PUT",body:{password},token:authSession.access_token});authMode="login";authMessage="密码已经更新，下次可以使用新密码登录。";renderAuthModal()}catch(error){authMessage=authErrorText(error.message);renderAuthModal()}}
 
+/* A reset/import is a replacement, not a merge. Responses begun before that
+   intent must not restore the old cloud snapshot into the replacement. */
+let syncReplacementGeneration=0;
+const saveStateBeforeReplacementTracking=saveState;
+saveState=(options={})=>{if(options.replaceCloud){state.progressEpoch=nextProgressEpoch(state,loadState(),ACTIVITY_ACTOR);syncReplacementGeneration++}return saveStateBeforeReplacementTracking(options)};
 let lastSyncError="";
 syncProgress=async(notify=false)=>{
   if(!authSession)return false;if(syncBusy){syncQueued=true;return false}
   const epoch=authEpoch,userId=authSession.user.id,isCurrent=()=>epoch===authEpoch&&authSession?.user?.id===userId;
+  const replacementGeneration=syncReplacementGeneration,isSnapshotCurrent=()=>isCurrent()&&replacementGeneration===syncReplacementGeneration;
   syncBusy=true;const replaceCloud=replaceCloudOnNextSync;replaceCloudOnNextSync=false;syncStatus="正在同步…";renderAccountUI();
   try{
-    const valid=await ensureSession();if(!isCurrent())return false;if(!valid)throw new Error("暂时无法刷新登录，请检查网络后重试");
+    const valid=await ensureSession();if(!isSnapshotCurrent())return false;if(!valid)throw new Error("暂时无法刷新登录，请检查网络后重试");
     const rows=await supabaseRequest('/rest/v1/user_progress?select=state&user_id=eq.'+encodeURIComponent(userId),{token:valid.access_token});
-    if(!isCurrent())return false;
-    if(!replaceCloud)state=mergeProgress(state,rows?.[0]?.state);persistLocalState();
+    if(!isSnapshotCurrent())return false;
+    if(!replaceCloud)adoptStoredProgress(rows?.[0]?.state);persistLocalState();
     await supabaseRequest("/rest/v1/user_progress?on_conflict=user_id",{method:"POST",body:{user_id:userId,state:structuredClone(state)},token:valid.access_token,headers:{Prefer:"resolution=merge-duplicates"}});
-    if(!isCurrent())return false;
+    if(!isSnapshotCurrent())return false;
     lastSyncError="";syncStatus="已同步 · "+new Date().toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"});renderDashboard();renderLibrary();renderProgress();if(notify)showToast("学习进度已同步");return true;
   }catch(error){
-    if(!isCurrent())return false;
+    if(!isSnapshotCurrent())return false;
     if(replaceCloud)replaceCloudOnNextSync=true;lastSyncError=authErrorText(error.message);syncStatus="同步失败 · "+lastSyncError;clearTimeout(syncTimer);if(authSession)syncTimer=setTimeout(()=>syncProgress(),15000);if(notify)showToast(syncStatus);return false;
-  }finally{syncBusy=false;renderAccountUI();updateConnectionStatus();if(syncQueued){syncQueued=false;scheduleCloudSync()}}
+  }finally{syncBusy=false;renderAccountUI();updateConnectionStatus();if(syncQueued||(isCurrent()&&replacementGeneration!==syncReplacementGeneration&&replaceCloudOnNextSync)){syncQueued=false;scheduleCloudSync()}}
 };
 
 document.addEventListener("keydown",event=>{if(event.key==="Escape"&&document.querySelector("#placement-modal").classList.contains("active"))setModalOpen("#placement-modal",false)});
+{
+  const migration=migrateLegacyMemoryState(state);
+  state=migration.state;
+  if(migration.changed){state.updatedAt=Date.now();persistLocalState()}
+}
 ensurePlacementCompletion();populateEnhancedSettings();renderDashboard();renderLibrary();renderProgress();consumeRecoveryLink();setTimeout(()=>{if(!ensurePlacementCompletion())openPlacement(true)},700);
-window.WordStepEnhancements={version:"20261016-1",retrievability,nextSchedule,openPlacement,exportProgress,migrateLegacyMemoryState,vocabularyLevel,ensurePlacementCompletion};
+window.WordStepEnhancements={version:"20261029-1",retrievability,nextSchedule,openPlacement,exportProgress,migrateLegacyMemoryState,vocabularyLevel,ensurePlacementCompletion};

@@ -99,3 +99,22 @@ function restoreFavorites(snapshot,current,actor,now=Date.now()){
   for(const id of Object.keys(known))restored[id]={saved:imported[id]?.saved===true,updatedAt,actor:restoreActor};
   return restored;
 }
+
+/* Reset/backup restore creates a new study-history epoch. A device with an
+   older epoch cannot reintroduce records deliberately replaced elsewhere. */
+function normalizeProgressEpoch(value){
+  if(!value||typeof value!=="object"||!Number.isSafeInteger(value.updatedAt)||value.updatedAt<=0)return {updatedAt:0,actor:""};
+  return {updatedAt:value.updatedAt,actor:typeof value.actor==="string"?value.actor:""};
+}
+function compareProgressEpoch(a,b){
+  const left=normalizeProgressEpoch(a?.progressEpoch),right=normalizeProgressEpoch(b?.progressEpoch);
+  return left.updatedAt!==right.updatedAt?Math.sign(left.updatedAt-right.updatedAt):left.actor===right.actor?0:left.actor>right.actor?1:-1;
+}
+function nextProgressEpoch(current,stored,actor,now=Date.now()){
+  const latest=Math.max(normalizeProgressEpoch(current?.progressEpoch).updatedAt,normalizeProgressEpoch(stored?.progressEpoch).updatedAt);
+  if(latest===Number.MAX_SAFE_INTEGER)throw new RangeError("Progress epoch exceeds the safe integer range");
+  return {updatedAt:Math.max(Number.isSafeInteger(now)&&now>=0?now:Date.now(),latest+1),actor:typeof actor==="string"?actor:""};
+}
+function progressStateFingerprint(value){
+  return JSON.stringify(value,(_key,entry)=>entry&&typeof entry==="object"&&!Array.isArray(entry)?Object.fromEntries(Object.keys(entry).sort().map(key=>[key,entry[key]])):entry);
+}

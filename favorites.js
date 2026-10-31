@@ -1,6 +1,6 @@
 /* Personal collection. Meanings are a temporary view state, not synced progress. */
 (() => {
-  const VERSION="20261016-1",PAGE_SIZE=50;
+  const VERSION="20261029-1",PAGE_SIZE=50;
   const byId=new Map(WORDS.map(word=>[String(word.id),word]));
   const byEnglish=new Map(WORDS.map(word=>[word.en.toLowerCase(),word]));
   let visibleLimit=PAGE_SIZE;
@@ -24,6 +24,9 @@
     return WORDS.filter(word=>isSaved(word.id)).sort((a,b)=>(state.favorites[b.id].updatedAt-state.favorites[a.id].updatedAt)||a.id-b.id);
   }
   function renderFavorites(){
+    const list=document.querySelector("#favorite-list"),focused=document.activeElement,focusedCard=focused?.closest?.("#favorite-list .favorite-card");
+    const focusedId=focusedCard?.dataset.wordId,focusedIndex=focusedCard?[...list.children].indexOf(focusedCard):0,emptyFocused=focused?.hasAttribute?.("data-favorites-library");
+    const focusAction=focused?.matches?.("[data-favorite-id]")?"[data-favorite-id]":focused?.matches?.("[data-speak]")?"[data-speak]":"[data-reveal-id]";
     for(const id of revealed)if(!isSaved(id))revealed.delete(id);
     const all=collectionWords(),query=document.querySelector("#favorite-search").value.trim().toLowerCase();
     const filtered=all.filter(word=>!query||word.en.toLowerCase().includes(query)),visible=filtered.slice(0,visibleLimit);
@@ -34,6 +37,11 @@
       return `<article class="favorite-card" data-word-id="${id}"><div class="favorite-card-header"><button type="button" class="favorite-word" data-reveal-id="${id}" aria-controls="favorite-meaning-${id}" aria-expanded="${open}"><strong>${escapeAttr(word.en)}</strong><small class="phonetic">${escapeAttr(word.phonetic)}</small><span class="favorite-reveal-label">${open?"隐藏中文":"点击显示中文"}</span></button><div class="favorite-card-actions"><button type="button" class="speak-button" data-speak="${escapeAttr(word.en)}" aria-label="朗读 ${escapeAttr(word.en)}" title="播放英语发音">🔊</button>${favoriteButton(word,true)}</div></div><div class="favorite-meaning" id="favorite-meaning-${id}" ${open?"":"hidden"}><p>${escapeAttr(word.zh)}</p><div class="favorite-example"><span>${escapeAttr(example.en)}</span><small>${escapeAttr(example.zh)}</small></div></div></article>`;
     }).join(""):`<div class="favorites-empty"><span aria-hidden="true">☆</span><h2>${all.length?"没有找到这个英文单词":"还没有收藏的单词"}</h2><p>${all.length?"试试更短的英文关键词。":"在词库或学习卡片上点击 ☆，就能加入这里。"}</p>${all.length?"":'<button class="secondary-button" type="button" data-favorites-library>去词库收藏</button>'}</div>`;
     const more=document.querySelector("#favorites-load-more");more.hidden=visible.length>=filtered.length;more.textContent=`再显示 ${Math.min(PAGE_SIZE,filtered.length-visible.length)} 个 · 共 ${filtered.length} 个收藏`;
+    if(focusedCard||emptyFocused){
+      const sameCard=list.querySelector(`.favorite-card[data-word-id="${focusedId}"]`),cards=list.querySelectorAll(".favorite-card");
+      const next= sameCard?.querySelector(focusAction)||cards[Math.min(focusedIndex,cards.length-1)]?.querySelector("[data-reveal-id]")||list.querySelector("[data-favorites-library]")||document.querySelector("#favorite-search");
+      next?.focus({preventScroll:true});
+    }
   }
   function decorateLibrary(){
     document.querySelectorAll("#word-list .word-row").forEach(row=>{
@@ -62,11 +70,11 @@
     try{updatedAt=nextFavoriteClock(current)}catch{showToast("收藏记录时间异常，请先导出备份后重试");return false}
     state.favorites={...current,[key]:{saved,updatedAt,actor:ACTIVITY_ACTOR}};
     if(!saved)revealed.delete(key);
-    saveState();updateCollection();showToast(saved?"已加入收藏词库":"已取消收藏");return saved;
+    saveState();showToast(saved?"已加入收藏词库":"已取消收藏");return saved;
   }
 
   const baseRenderLibrary=renderLibrary;
-  renderLibrary=()=>{baseRenderLibrary();decorateLibrary();updateCollection()};
+  renderLibrary=()=>{const focused=document.activeElement,favoriteId=focused?.closest?.("#word-list")?focused.dataset.favoriteId:null;baseRenderLibrary();decorateLibrary();updateCollection();if(favoriteId)document.querySelector(`#word-list [data-favorite-id="${favoriteId}"]`)?.focus({preventScroll:true})};
   const baseRenderQuestion=renderQuestion,baseRenderSpelling=renderSpelling;
   renderQuestion=()=>{baseRenderQuestion();decorateStudy()};
   renderSpelling=()=>{baseRenderSpelling();decorateStudy()};
@@ -81,13 +89,13 @@
 
   document.addEventListener("click",event=>{
     const favorite=event.target.closest("[data-favorite-id]");
-    if(favorite){event.preventDefault();const inCollection=!!favorite.closest("#favorite-list");toggleFavorite(favorite.dataset.favoriteId);if(inCollection)document.querySelector("#favorite-list [data-reveal-id], [data-favorites-library]")?.focus();return}
+    if(favorite){event.preventDefault();toggleFavorite(favorite.dataset.favoriteId);return}
     const reveal=event.target.closest("[data-reveal-id]");
     if(reveal){event.preventDefault();const id=reveal.dataset.revealId,panel=document.getElementById(`favorite-meaning-${id}`);if(!panel)return;const open=panel.hidden;panel.hidden=!open;reveal.setAttribute("aria-expanded",String(open));reveal.querySelector(".favorite-reveal-label").textContent=open?"隐藏中文":"点击显示中文";if(open)revealed.add(id);else revealed.delete(id);return}
     if(event.target.closest("[data-favorites-library]"))switchView("library");
   });
   document.querySelector("#favorite-search").addEventListener("input",()=>{visibleLimit=PAGE_SIZE;renderFavorites()});
-  document.querySelector("#favorites-load-more").addEventListener("click",()=>{visibleLimit+=PAGE_SIZE;renderFavorites()});
+  document.querySelector("#favorites-load-more").addEventListener("click",()=>{const previousCount=document.querySelectorAll("#favorite-list .favorite-card").length;visibleLimit+=PAGE_SIZE;renderFavorites();document.querySelectorAll("#favorite-list .favorite-card")[previousCount]?.querySelector("[data-reveal-id]")?.focus()});
   document.querySelector("#reset-progress").onclick=()=>{
     if(!confirm("确定清除学习进度吗？收藏单词会保留。"))return;
     const favorites=normalizeFavorites(state.favorites);state={...structuredClone(defaultState),favorites};saveState({replaceCloud:true});setModalOpen("#settings-modal",false);renderDashboard();renderLibrary();renderProgress();showToast("学习进度已重置，收藏已保留");
