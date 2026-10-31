@@ -119,7 +119,13 @@ function weakness(record){
   const age=record.lastReviewAt?Math.max(0,(Date.now()-record.lastReviewAt)/DAY):30,recency=Math.exp(-age/45),rating=record.lastRating==="again"?3:record.lastRating==="hard"?1.4:0;
   return rating+(record.unknowns||0)*.7*recency+(record.lapses||0)*.25*recency+Math.max(0,(record.difficulty||5)-5)*.35+(1-retrievability(record));
 }
-unseenWords=()=>WORDS.filter(word=>ws(word.id).stage<0&&word.level===state.level&&trackMatches(word));
+unseenWords=()=>{
+  // A level is the starting difficulty, not a permanent ceiling. Exhausting it
+  // must not silently remove the rest of the daily new-word target.
+  const levels=WORDSTEP_LEVELS.slice(Math.max(0,WORDSTEP_LEVELS.indexOf(state.level))),pools=new Map(levels.map(level=>[level,[]]));
+  for(const word of WORDS)if(pools.has(word.level)&&ws(word.id).stage<0&&trackMatches(word))pools.get(word.level).push(word);
+  return levels.flatMap(level=>pools.get(level));
+};
 dueWords=()=>WORDS.filter(word=>{const record=ws(word.id);return record.stage>=0&&record.due<=dayStart()}).sort((left,right)=>retrievability(ws(left.id))-retrievability(ws(right.id))||weakness(ws(right.id))-weakness(ws(left.id))||ws(left.id).due-ws(right.id).due);
 weakWords=()=>WORDS.filter(word=>ws(word.id).stage>=0&&weakness(ws(word.id))>1.1).sort((left,right)=>weakness(ws(right.id))-weakness(ws(left.id)));
 function reviewAllowance(){return Math.max(0,state.reviewLimit-Math.max(0,Number(state.activity[localDate()]?.reviews)||0))}
@@ -196,8 +202,11 @@ function finishPlacement(level){
 function modeForQuestion(){if(state.trainingMode==="mixed")return session.idx%3===1?"listening":"reading";return state.trainingMode}
 openSession=()=>{
   if(!ensurePlacementCompletion()){openPlacement(true);return}
-  let queue=todayQueue(),isExtra=false;if(!queue.length&&reviewAllowance()>0){queue=weakWords().slice(0,Math.min(reviewAllowance(),Math.max(5,state.dailyGoal)));isExtra=true}if(!queue.length){showToast("今日计划已完成，或当前等级暂无新词；可在设置中查看学习计划");return}
-  session={queue,idx:0,phase:"choice",correct:0,errors:0,unknowns:0,listening:0,isExtra,studyDate:localDate(),currentHadError:false,currentErrorCount:0,currentUnknown:false,forceCorrection:false,currentQuestionType:null};
+  let queue=todayQueue(),isExtra=false;
+  if(!queue.length&&newAllowance()>0&&!unseenWords().length){populateEnhancedSettings();setModalOpen("#settings-modal",true);showToast("当前学习范围的新词已学完，可调整等级或学习目标；今日新词目标尚未完成");return}
+  if(!queue.length&&reviewAllowance()>0){queue=weakWords().slice(0,Math.min(reviewAllowance(),Math.max(5,state.dailyGoal)));isExtra=true}if(!queue.length){showToast("今日安排已完成，可在设置中查看学习计划");return}
+  const newWordIds=queue.filter(word=>ws(word.id).stage<0).map(word=>word.id);
+  session={queue,newWordIds,reviewWordCount:queue.length-newWordIds.length,idx:0,phase:"choice",correct:0,errors:0,unknowns:0,listening:0,isExtra,studyDate:localDate(),currentHadError:false,currentErrorCount:0,currentUnknown:false,forceCorrection:false,currentQuestionType:null};
   document.body.classList.add("session-open");document.querySelector("#session-overlay").classList.add("active");document.querySelector("#session-overlay").setAttribute("aria-hidden","false");renderQuestion();
 };
 document.querySelector("#start-session").onclick=openSession;
@@ -206,8 +215,14 @@ function queueQuestionSpeech(word,phase){
   const owner=session,index=session.idx,requestId=speechRequestId;
   setTimeout(()=>{if(session===owner&&session.idx===index&&session.phase===phase&&requestId===speechRequestId&&!document.hidden)speakWord(word.en)},100);
 }
+function renderSessionPlanStatus(){
+  const element=document.querySelector("#session-plan-status");if(!element)return;
+  element.hidden=!session;if(!session)return;
+  const newIds=session.newWordIds||session.queue.filter(word=>ws(word.id).stage<0).map(word=>word.id),reviews=session.reviewWordCount??session.queue.length-newIds.length,word=currentWord();
+  element.textContent=`本组计划：复习 ${reviews} 词 · 新学 ${newIds.length} 词${word?` ｜ 当前：${newIds.includes(word.id)?"新学":"复习"}`:""}`;
+}
 renderQuestion=()=>{
-  stopActiveSpeech();const word=currentWord(),progress=session.idx/session.queue.length*100;document.querySelector("#session-progress-bar").style.width=`${progress}%`;document.querySelector("#session-step").textContent=`${session.idx+1} / ${session.queue.length}`;
+  stopActiveSpeech();renderSessionPlanStatus();const word=currentWord(),progress=session.idx/session.queue.length*100;document.querySelector("#session-progress-bar").style.width=`${progress}%`;document.querySelector("#session-step").textContent=`${session.idx+1} / ${session.queue.length}`;
   if(session.phase!=="choice"){renderSpelling();return}
   const mode=modeForQuestion();session.currentQuestionType=mode;
   if(mode==="dictation"){session.phase="spelling";renderSpelling();return}
@@ -225,7 +240,7 @@ choiceFeedback=({correct,answer,speakText,phonetic,unknown=false})=>{
 };
 
 renderSpelling=()=>{
-  stopActiveSpeech();const word=currentWord(),example=clozeExample(word),dictation=session.currentQuestionType==="dictation";
+  stopActiveSpeech();renderSessionPlanStatus();const word=currentWord(),example=clozeExample(word),dictation=session.currentQuestionType==="dictation";
   document.querySelector("#study-card").innerHTML=`<span class="question-type">${dictation?"DICTATION · 听写强化":"拼写练习 · 必须拼对才能继续"}</span>${dictation?`<div class="listening-prompt"><button class="speak-button large" data-speak="${escapeAttr(word.en)}" aria-label="播放单词发音">🔊</button><span class="mode-chip">听发音并拼写</span></div>`:`<h2 class="question-main chinese">${escapeAttr(primaryMeaning(word))}</h2><span class="phonetic">${escapeAttr(word.phonetic)}</span>`}<div class="spelling-example"><span>${example.kind==="definition"?"语境释义":"例句"}</span><p>${escapeAttr(example.en)}</p><small>${escapeAttr(example.zh)}</small></div>${phraseHintHtml(word,true)}<form class="spell-form" id="spell-form"><input class="spell-input" id="spell-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="输入英文单词" aria-label="输入英文拼写"><div class="spell-actions"><button class="primary-button" type="submit">检查拼写</button><button class="unknown-button" id="spell-unknown" type="button">不认识</button></div><div id="spell-feedback" aria-live="polite"></div></form>`;
   const input=document.querySelector("#spell-input");input.placeholder=word.en.includes(" ")?"输入英文短语":"输入英文单词";input.focus();document.querySelector("#spell-form").onsubmit=event=>{event.preventDefault();checkSpelling(input.value)};document.querySelector("#spell-unknown").onclick=markSpellingUnknown;if(dictation){session.listening++;queueQuestionSpeech(word,"spelling")}
 };
@@ -246,18 +261,22 @@ finishWord=(rating="good")=>{
   session.correctWords=(session.correctWords||0)+(!session.currentHadError?1:0);session.idx++;session.phase="choice";session.currentHadError=false;session.currentErrorCount=0;session.currentUnknown=false;session.forceCorrection=false;session.currentQuestionType=null;if(session.idx>=session.queue.length)renderComplete();else renderQuestion();
 };
 
-renderComplete=()=>{const accuracy=session.queue.length?Math.round((session.correctWords||0)/session.queue.length*100):100;document.querySelector("#session-progress-bar").style.width="100%";document.querySelector("#session-step").textContent="完成";document.querySelector("#study-card").innerHTML=`<div class="completion-icon">✓</div><span class="question-type">TODAY COMPLETE</span><h2 class="question-main chinese">今天的训练完成了！</h2><p class="question-note">动态记忆模型已经根据本次答题表现安排好下一次复习。</p><div class="completion-stats"><div><strong>${session.queue.length}</strong><span>完成词数</span></div><div><strong>${accuracy}%</strong><span>本组准确率</span></div><div><strong>${session.listening}</strong><span>听力练习</span></div></div><button class="primary-button" id="finish-session">返回首页</button>`;document.querySelector("#finish-session").onclick=closeSession};
+renderComplete=()=>{renderSessionPlanStatus();const accuracy=session.queue.length?Math.round((session.correctWords||0)/session.queue.length*100):100;document.querySelector("#session-progress-bar").style.width="100%";document.querySelector("#session-step").textContent="完成";document.querySelector("#study-card").innerHTML=`<div class="completion-icon">✓</div><span class="question-type">TODAY COMPLETE</span><h2 class="question-main chinese">今天的训练完成了！</h2><p class="question-note">动态记忆模型已经根据本次答题表现安排好下一次复习。</p><div class="completion-stats"><div><strong>${session.queue.length}</strong><span>完成词数</span></div><div><strong>${accuracy}%</strong><span>本组准确率</span></div><div><strong>${session.listening}</strong><span>听力练习</span></div></div><button class="primary-button" id="finish-session">返回首页</button>`;document.querySelector("#finish-session").onclick=closeSession};
 
 renderDashboard=()=>{
   ensurePlacementCompletion();
-  const allDue=dueWords(),scheduled=allDue.slice(0,reviewAllowance()),completedNew=learnedToday(),fresh=Math.min(newAllowance(),unseenWords().length),weak=weakWords().length,total=scheduled.length+fresh,backlog=Math.max(0,allDue.length-scheduled.length);
+  const allDue=dueWords(),scheduled=allDue.slice(0,reviewAllowance()),completedNew=learnedToday(),remaining=newAllowance(),unseen=unseenWords(),freshWords=unseen.slice(0,remaining),fresh=freshWords.length,weak=weakWords().length,total=scheduled.length+fresh,backlog=Math.max(0,allDue.length-scheduled.length);
+  const startingLevel=WORDSTEP_LEVELS.includes(state.level)?state.level:"A2",planLevels=WORDSTEP_LEVELS.filter(level=>freshWords.some(word=>word.level===level)),continues=planLevels.some(level=>level!==startingLevel);
+  const rangeNote=remaining>0&&!unseen.length?"当前学习范围的新词已学完（所选目标下的当前及更高等级），请在设置中调整等级或学习目标。":remaining>fresh?`当前学习范围仅剩 ${fresh} 个未学词，暂不能补满今日目标。`:"";
+  const continuation=continues?`当前 ${startingLevel} 新词不足，按 ${[...new Set([startingLevel,...planLevels])].join(" → ")} 接续学习。`:"";
+  const newPlan=`今日新词目标 ${state.dailyGoal} 个，已完成 ${completedNew} 个，还需 ${remaining} 个，本次安排新学 ${fresh} 个。`;
   document.querySelector("#today-date").textContent=new Intl.DateTimeFormat("zh-CN",{month:"long",day:"numeric",weekday:"long"}).format(new Date());
   document.querySelector("#streak-number").textContent=streak();document.querySelector("#profile-streak").textContent=`连续学习 ${streak()} 天`;
   document.querySelector("#review-count").textContent=scheduled.length;document.querySelector("#new-count").textContent=fresh;document.querySelector("#new-completed").textContent=Math.min(completedNew,state.dailyGoal);document.querySelector("#new-goal").textContent=state.dailyGoal;document.querySelector("#weak-count").textContent=weak;
   document.querySelector("#task-total").textContent=`${total} 个待完成${backlog?` · ${backlog} 个积压已分批`:""}`;
-  document.querySelector("#plan-summary").textContent=total?`先复习 ${scheduled.length} 词。今日新词目标 ${state.dailyGoal} 个，已完成 ${completedNew} 个，还需 ${fresh} 个，约需 ${Math.max(3,Math.ceil(total*.75))} 分钟。${backlog?`其余 ${backlog} 个复习会分批安排。`:""}`:"今天的计划已经完成。可以练习易错词或切换词汇等级。";
-  const button=document.querySelector("#start-session");button.innerHTML=total?"开始今日学习 <span>→</span>":"再练一组易错词 <span>→</span>";
-  const next=unseenWords()[0],preview=scheduled[0]||next;document.querySelector("#today-scene").textContent=next?`${next.level||state.level} · ${next.category}`:"当前等级已完成";renderPlanPreview(preview,scheduled.length?"待复习":"下一个新词");
+  document.querySelector("#plan-summary").textContent=total?`先复习 ${scheduled.length} 词。${newPlan}${continuation}${rangeNote}约需 ${Math.max(3,Math.ceil(total*.75))} 分钟。${backlog?`其余 ${backlog} 个复习会分批安排。`:""}`:remaining>0?`${newPlan}${rangeNote}`:`${newPlan}今天的计划已经完成。可以练习易错词或切换词汇等级。`;
+  const button=document.querySelector("#start-session");button.innerHTML=total?"开始今日学习 <span>→</span>":remaining>0&&!unseen.length?"调整学习范围 <span>→</span>":"再练一组易错词 <span>→</span>";
+  const next=unseen[0],preview=scheduled[0]||next;document.querySelector("#today-scene").textContent=next?`${next.level} · ${next.category}${next.level!==startingLevel?`（由 ${startingLevel} 接续）`:""}`:"当前学习范围新词已学完";renderPlanPreview(preview,scheduled.length?"待复习":"下一个新词");
   const activity=state.activity[localDate()]||{};document.querySelector("#review-progress").style.width=`${scheduled.length?Math.min(100,(activity.reviews||0)/(scheduled.length+(activity.reviews||0))*100):100}%`;document.querySelector("#new-progress").style.width=`${state.dailyGoal?Math.min(100,completedNew/state.dailyGoal*100):0}%`;document.querySelector("#weak-progress").style.width=`${weak?Math.min(100,(activity.spelling||0)/weak*100):100}%`;document.querySelector("#placement-banner").hidden=state.placementDone;renderWeek();updateConnectionStatus();
 };
 
@@ -337,4 +356,4 @@ document.addEventListener("keydown",event=>{if(event.key==="Escape"&&document.qu
   if(migration.changed){state.updatedAt=Date.now();persistLocalState()}
 }
 ensurePlacementCompletion();populateEnhancedSettings();renderDashboard();renderLibrary();renderProgress();consumeRecoveryLink();setTimeout(()=>{if(!ensurePlacementCompletion())openPlacement(true)},700);
-window.WordStepEnhancements={version:"20261029-1",retrievability,nextSchedule,openPlacement,exportProgress,migrateLegacyMemoryState,vocabularyLevel,ensurePlacementCompletion};
+window.WordStepEnhancements={version:"20261031-1",retrievability,nextSchedule,openPlacement,exportProgress,migrateLegacyMemoryState,vocabularyLevel,ensurePlacementCompletion};

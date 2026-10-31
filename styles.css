@@ -39,3 +39,4 @@ body{font-family:"Segoe UI","PingFang SC","Microsoft YaHei",Arial,sans-serif}
 @media(max-width:680px){.phrase-hint{grid-template-columns:auto 1fr}.phrase-hint small{grid-column:2}}
 @media(max-width:680px){.library-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}.total-stat,.visible-stat{min-width:0}.level-stat{display:none}.stats-reset{grid-column:1/-1}.load-more{font-size:12px;line-height:1.4}}
 body.session-open{overflow:hidden}.session-overlay.active{animation:none;opacity:1;isolation:isolate}
+.session-plan-status{max-width:800px;margin:12px auto 0;text-align:center;font-size:12px;line-height:1.6;color:var(--muted);overflow-wrap:anywhere}

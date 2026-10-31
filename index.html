@@ -15,8 +15,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="WordStep" />
-  <link rel="stylesheet" href="styles.css?v=20261015-1" />
-  <link rel="stylesheet" href="favorites-20261029-1.css" />
+  <link rel="stylesheet" href="styles.css?v=20261031-1" />
+  <link rel="stylesheet" href="favorites-20261031-1.css" />
 </head>
 <body>
   <div class="app-shell">
@@ -81,7 +81,7 @@
             <div class="mini-progress"><span id="review-progress"></span></div>
           </article>
           <article class="task-card new-task">
-            <div class="task-icon green">＋</div><div class="task-info"><span class="task-label">今日新词进度</span><h3><span id="new-completed">0</span> / <span id="new-goal">10</span> 个</h3><p><span id="new-count">10</span> 个待学习 · <span id="today-scene">正在匹配场景</span></p></div>
+            <div class="task-icon green">＋</div><div class="task-info"><span class="task-label">今日新词进度</span><h3><span id="new-completed">0</span> / <span id="new-goal">10</span> 个</h3><p>本次可安排 <span id="new-count">10</span> 个 · <span id="today-scene">正在匹配场景</span></p></div>
             <div class="mini-progress"><span id="new-progress"></span></div>
           </article>
           <article class="task-card spelling-task">
@@ -141,6 +141,7 @@
       <div class="session-progress"><span id="session-progress-bar"></span></div>
       <span id="session-step">1 / 10</span>
     </div>
+    <p class="session-plan-status" id="session-plan-status" aria-live="polite" hidden></p>
     <div class="study-card" id="study-card"></div>
   </div>
 
@@ -153,7 +154,7 @@
       <div class="range-marks"><span>5</span><span>20</span><span>30</span><span>40</span><span>55</span><span>70</span></div>
       <div class="setting-note"><span>◷</span><div><strong>预计每天 <span id="estimated-time">10</span> 分钟</strong><p>新词与复习分别计算；提高复习上限不会减少新词目标。</p></div></div>
       <div class="settings-grid">
-        <label>当前词汇等级<select id="level-select"><option value="A2">A2 · 日常基础</option><option value="B1">B1 · 独立交流</option><option value="B2">B2+ · 进阶词汇</option></select></label>
+        <label>新词起始等级<select id="level-select"><option value="A2">A2 · 日常基础</option><option value="B1">B1 · 独立交流</option><option value="B2">B2+ · 进阶词汇</option></select></label>
         <label>学习目标<select id="track-select"><option value="all">生活与工作</option><option value="daily">日常生活</option><option value="work">职场沟通</option></select></label>
         <label>训练模式<select id="mode-select"><option value="mixed">综合训练</option><option value="reading">认词与拼写</option><option value="listening">听音辨义</option><option value="dictation">听写强化</option></select></label>
         <label>每日复习上限<select id="review-limit-select"><option value="30">30 词</option><option value="50">50 词</option><option value="80">80 词</option><option value="120">120 词</option><option value="150">150 词</option></select></label>
@@ -188,9 +189,9 @@
 
   <div class="toast" id="toast"></div>
   <script src="compact-words-20261015-1.js?v=20261015-1"></script>
-  <script src="app-20261029-1.js"></script>
-  <script src="sync-model-20261029-1.js"></script>
-  <script src="enhancements-20261029-1.js"></script>
-  <script src="favorites-20261029-1.js"></script>
+  <script src="app-20261031-1.js"></script>
+  <script src="sync-model-20261031-1.js"></script>
+  <script src="enhancements-20261031-1.js"></script>
+  <script src="favorites-20261031-1.js"></script>
 </body>
 </html>
