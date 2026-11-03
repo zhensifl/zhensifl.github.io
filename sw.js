@@ -1,7 +1,7 @@
-const CACHE_NAME="wordstep-20261103-1";
-const VOCABULARY_VERSION="20261103-1";
-const SHELL=["./","./index.html","./styles.css","./app-20261103-1.js","./enhancements-20261103-1.js","./sync-model-20261103-1.js","./favorites-20261103-1.js","./favorites-20261103-1.css","./manifest.webmanifest","./icon.svg","./icon-32.png","./icon-192.png","./icon-512.png","./icon-maskable-512.png","./apple-touch-icon.png","./version.json"];
-const DATA=["./compact-words-20261103-1.js"];
+const CACHE_NAME="wordstep-20261103-2";
+const VOCABULARY_VERSION="20261103-2";
+const SHELL=["./","./index.html","./styles.css","./app-20261103-2.js","./enhancements-20261103-2.js","./sync-model-20261103-2.js","./favorites-20261103-2.js","./favorites-20261103-2.css","./manifest.webmanifest","./icon.svg","./icon-32.png","./icon-192.png","./icon-512.png","./icon-maskable-512.png","./apple-touch-icon.png","./version.json"];
+const DATA=["./compact-words-20261103-2.js"];
 const NAVIGATION_TIMEOUT=2200;
 self.addEventListener("install",event=>event.waitUntil(caches.open(CACHE_NAME).then(async cache=>{
   await cache.addAll(SHELL);
@@ -28,14 +28,14 @@ self.addEventListener("fetch",event=>{
     event.waitUntil(network.catch(()=>{}));
     return;
   }
-  if(url.pathname.endsWith("/compact-words-20261103-1.js")){
+  if(url.pathname.endsWith("/compact-words-20261103-2.js")){
     event.respondWith(caches.open(CACHE_NAME).then(async cache=>{
       const version=url.searchParams.get("v");
       if(version&&version!==VOCABULARY_VERSION)return fetch(request,{cache:"no-store"});
-      const cached=await cache.match("./compact-words-20261103-1.js");
+      const cached=await cache.match("./compact-words-20261103-2.js");
       if(cached)return cached;
       const response=await fetch(request);
-      if(response.ok)await cache.put("./compact-words-20261103-1.js",response.clone());
+      if(response.ok)await cache.put("./compact-words-20261103-2.js",response.clone());
       return response;
     }));
     return;
