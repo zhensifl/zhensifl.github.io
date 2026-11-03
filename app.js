@@ -146,12 +146,12 @@ const NEXT_AVAILABLE_WORD_ID=Math.max(0,...BASE_WORDS.map(word=>Number(word.id)|
 const ALL_WORDS = [...BASE_WORDS,...(window.WORDSTEP_ESSENTIAL_WORDS||[]).filter(word=>!BASE_WORD_KEYS.has(word.en.toLowerCase())).map((word,index)=>({...word,pos:partOfSpeech(word),id:NEXT_AVAILABLE_WORD_ID+index,isCurated:true,isEssential:true}))];
 function isUsefulVocabulary(word){return COMPACT_VOCABULARY||word.senseVersion==="20260903-1"&&word.qualityReady===true&&window.WORDSTEP_FOCUSED_WORDS?.has(word.en.toLowerCase())&&word.en.length>=3&&Number(word.frequencyRank||Infinity)>=MIN_GENERATED_RANK&&!word.base&&!word.proper&&!EXCLUDED_WORDS.has(word.en.toLowerCase())&&!/(?:男子名|女子名|人名|城市名|州名|国家名|国名|首都)/.test(word.zh)}
 const vocabularySeen=new Set();
-const WORDS = ALL_WORDS.filter(word=>{const key=word.en.toLowerCase();if(vocabularySeen.has(key))return false;if((TOO_BASIC_WORDS.has(key)&&!word.isEssential&&!word.usDaily)||(!word.isCurated&&!isUsefulVocabulary(word)))return false;vocabularySeen.add(key);return true}).sort((a,b)=>(a.isJobCore?-4:a.isDailyCore?-3:a.isEssential?-2:a.isCurated?-1:(window.WORDSTEP_FOCUS_PRIORITY?.[a.en]??3))-(b.isJobCore?-4:b.isDailyCore?-3:b.isEssential?-2:b.isCurated?-1:(window.WORDSTEP_FOCUS_PRIORITY?.[b.en]??3))||(Number(a.frequencyRank)||Infinity)-(Number(b.frequencyRank)||Infinity));
+const WORDS = ALL_WORDS.filter(word=>{const key=word.en.toLowerCase();if(vocabularySeen.has(key))return false;if((TOO_BASIC_WORDS.has(key)&&!word.isEssential&&!word.usDaily)||(!word.isCurated&&!isUsefulVocabulary(word)))return false;vocabularySeen.add(key);return true}).sort((a,b)=>(a.isDailyCore||a.isConversationCore?-3:a.isEssential?-2:a.isCurated?-1:(window.WORDSTEP_FOCUS_PRIORITY?.[a.en]??3))-(b.isDailyCore||b.isConversationCore?-3:b.isEssential?-2:b.isCurated?-1:(window.WORDSTEP_FOCUS_PRIORITY?.[b.en]??3))||(Number(a.frequencyRank)||Infinity)-(Number(b.frequencyRank)||Infinity));
 
 const STORAGE_KEY = "wordstep-state-v1";
 const AUTH_STORAGE_KEY = "wordstep-auth-v1";
-const APP_VERSION = "20261031-1";
-const VOCABULARY_VERSION = "20261015-1";
+const APP_VERSION = "20261103-1";
+const VOCABULARY_VERSION = "20261103-1";
 const SUPABASE_URL = "https://wgvxdzwrvgktcidmofit.supabase.co";
 const SUPABASE_KEY = "sb_publishable_O2PaZM-nTJKAaeUYKiXbBw_r4WmllMx";
 const DAY = 86400000;

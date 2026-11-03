@@ -356,4 +356,4 @@ document.addEventListener("keydown",event=>{if(event.key==="Escape"&&document.qu
   if(migration.changed){state.updatedAt=Date.now();persistLocalState()}
 }
 ensurePlacementCompletion();populateEnhancedSettings();renderDashboard();renderLibrary();renderProgress();consumeRecoveryLink();setTimeout(()=>{if(!ensurePlacementCompletion())openPlacement(true)},700);
-window.WordStepEnhancements={version:"20261031-1",retrievability,nextSchedule,openPlacement,exportProgress,migrateLegacyMemoryState,vocabularyLevel,ensurePlacementCompletion};
+window.WordStepEnhancements={version:"20261103-1",retrievability,nextSchedule,openPlacement,exportProgress,migrateLegacyMemoryState,vocabularyLevel,ensurePlacementCompletion};

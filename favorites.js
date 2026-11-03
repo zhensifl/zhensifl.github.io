@@ -1,6 +1,6 @@
 /* Personal collection. Meanings are a temporary view state, not synced progress. */
 (() => {
-  const VERSION="20261031-1",PAGE_SIZE=50;
+  const VERSION="20261103-1",PAGE_SIZE=50;
   const byId=new Map(WORDS.map(word=>[String(word.id),word]));
   const byEnglish=new Map(WORDS.map(word=>[word.en.toLowerCase(),word]));
   let visibleLimit=PAGE_SIZE;
